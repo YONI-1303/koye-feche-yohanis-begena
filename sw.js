@@ -1,10 +1,10 @@
-const CACHE_NAME = "kfy-begena-v6";
+const CACHE_NAME = "kfy-begena-v7";
 
 const APP_SHELL = [
     "./",
     "./index.html",
     "./styles.css",
-    "./app.js?v=208",
+    "./app.js?v=210",
     "./manifest.webmanifest"
 ];
 

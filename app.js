@@ -251,21 +251,119 @@ function escapeHtml(value) {
 const OFFLINE_STUDENT_KEY =
     "koye_feche_offline_student_v1";
 
+async function getOnlineSupabaseSession() {
+
+    if (!supabaseClient || !navigator.onLine) {
+        return null;
+    }
+
+    try {
+
+        const {
+            data,
+            error
+        } = await supabaseClient.auth.getSession();
+
+        if (error) {
+            console.warn(
+                "⚠️ Could not restore online Supabase session:",
+                error
+            );
+            return null;
+        }
+
+        return data?.session || null;
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ Supabase session restore failed:",
+            error
+        );
+        return null;
+    }
+
+}
+
+
+async function updateOfflineStudentSnapshot() {
+
+    try {
+
+        const raw =
+            localStorage.getItem(OFFLINE_STUDENT_KEY);
+
+        if (!raw) {
+            return false;
+        }
+
+        const offlineData =
+            JSON.parse(raw);
+
+        if (!offlineData || offlineData.version !== 1) {
+            return false;
+        }
+
+        offlineData.currentClass =
+            state.currentClass ||
+            offlineData.currentClass ||
+            null;
+
+        offlineData.studentAttendance =
+            Array.isArray(state.studentAttendance)
+                ? state.studentAttendance
+                : (offlineData.studentAttendance || []);
+
+        offlineData.savedAt =
+            new Date().toISOString();
+
+        localStorage.setItem(
+            OFFLINE_STUDENT_KEY,
+            JSON.stringify(offlineData)
+        );
+
+        return true;
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ Offline student snapshot update failed:",
+            error
+        );
+
+        return false;
+
+    }
+
+}
+
+
 async function cacheStudentOfflineContent() {
 
     if (
         !supabaseClient ||
         !window.currentUser ||
-        window.currentUser.offline ||
         window.currentProfile?.role !== "student"
     ) {
 
-        return;
+        return false;
 
     }
 
     const userId =
         window.currentUser.id;
+
+    // Always refresh the class before caching class-scoped content.
+    if (navigator.onLine) {
+        try {
+            await loadStudentClass(userId);
+        } catch (error) {
+            console.warn(
+                "⚠️ Student class refresh failed during offline sync:",
+                error
+            );
+        }
+    }
 
     const classId =
         state.currentClass?.id;
@@ -616,11 +714,126 @@ async function cacheStudentOfflineContent() {
     }
 
 
+    await updateOfflineStudentSnapshot();
+
     console.log(
         "✅ Student offline content saved"
     );
 
+    return true;
+
 }
+
+
+let studentOfflineSyncInFlight = false;
+
+async function syncStudentOfflineContent({
+    renderAfter = false,
+    reason = "manual"
+} = {}) {
+
+    if (
+        studentOfflineSyncInFlight ||
+        !navigator.onLine ||
+        !supabaseClient
+    ) {
+        return false;
+    }
+
+    studentOfflineSyncInFlight = true;
+
+    try {
+
+        const session =
+            await getOnlineSupabaseSession();
+
+        if (!session?.user?.id) {
+
+            console.log(
+                "ℹ️ No online Supabase session available for sync:",
+                reason
+            );
+
+            return false;
+        }
+
+        const user = session.user;
+
+        // Convert the temporary offline identity back to a real Supabase identity.
+        window.currentUser = {
+            ...user,
+            offline: false
+        };
+
+        const profile =
+            await loadUserProfile(user.id);
+
+        if (!profile || profile.role !== "student") {
+            console.warn(
+                "⚠️ Online sync skipped: student profile could not be restored."
+            );
+            return false;
+        }
+
+        window.currentProfile = profile;
+        state.role = "student";
+
+        await loadRoleData();
+        await cacheStudentOfflineContent();
+        await updateOfflineStudentSnapshot();
+
+        console.log(
+            "✅ Student offline content synchronized:",
+            reason
+        );
+
+        if (renderAfter) {
+            await showApp();
+            await render();
+        }
+
+        return true;
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ Student offline sync failed:",
+            reason,
+            error
+        );
+
+        return false;
+
+    } finally {
+
+        studentOfflineSyncInFlight = false;
+
+    }
+
+}
+
+
+function scheduleStudentOfflineSync(reason = "scheduled") {
+
+    if (!navigator.onLine || !supabaseClient) {
+        return;
+    }
+
+    window.setTimeout(() => {
+
+        if (
+            window.currentProfile?.role === "student" ||
+            window.currentUser?.offline
+        ) {
+            syncStudentOfflineContent({
+                renderAfter: true,
+                reason
+            });
+        }
+    }, 0);
+
+}
+
 function arrayBufferToBase64(buffer) {
 
     const bytes =
@@ -1383,6 +1596,9 @@ function updateProfileUI() {
 
 async function loadStudentClass(userId) {
 
+    const previousClass =
+        state.currentClass || null;
+
     state.currentClass =
         null;
 
@@ -1392,7 +1608,10 @@ async function loadStudentClass(userId) {
         !userId
     ) {
 
-        return null;
+        state.currentClass =
+            previousClass;
+
+        return previousClass;
 
     }
 
@@ -1442,7 +1661,10 @@ async function loadStudentClass(userId) {
                 error.message
             );
 
-            return null;
+            state.currentClass =
+                previousClass;
+
+            return previousClass;
 
         }
 
@@ -1471,7 +1693,10 @@ async function loadStudentClass(userId) {
             error
         );
 
-        return null;
+        state.currentClass =
+            previousClass;
+
+        return previousClass;
 
     }
 
@@ -1713,11 +1938,22 @@ if (!supabaseClient) {
     } catch (error) {
 
         console.warn(
-            "⚠️ Student attendance request failed:",
+            "⚠️ Student attendance request failed. Using offline copy:",
             error
         );
 
-        return [];
+        const cachedAttendance =
+            getOfflineContent(
+                `attendance_${userId}`,
+                []
+            );
+
+        state.studentAttendance =
+            Array.isArray(cachedAttendance)
+                ? cachedAttendance
+                : [];
+
+        return state.studentAttendance;
 
     }
 
@@ -2261,14 +2497,12 @@ async function initializeAuth() {
     }
 
     /*
-       🔒 PRIVACY MODE
+       🔒 LOGIN GATE
 
-       A sessionStorage flag exists only while this tab/app
-       session is active.
-
-       If the page was refreshed or reopened without the flag,
-       the Supabase session is destroyed and the login page
-       is shown.
+       The app session flag controls whether the UI is shown.
+       IMPORTANT: do not destroy the Supabase session here.
+       Keeping the refresh token lets a previously authenticated
+       student reconnect automatically after using offline login.
     */
 
     const appSession =
@@ -2279,7 +2513,7 @@ async function initializeAuth() {
     if (!appSession) {
 
         console.log(
-            "🔒 No active app session. Logging out."
+            "🔒 No active app session. Showing login without signing out Supabase."
         );
 
         window.currentUser = null;
@@ -2288,15 +2522,6 @@ async function initializeAuth() {
         state.currentClass = null;
         state.studentAttendance = [];
         state.mentorClasses = [];
-
-        try {
-            await supabaseClient.auth.signOut();
-        } catch (error) {
-            console.error(
-                "❌ Privacy logout failed:",
-                error
-            );
-        }
 
         await showLoginPage();
         return;
@@ -2781,38 +3006,32 @@ console.log("🟠 LOGIN LOOKUP RESULT:", lookupData);
 
 
                 await loadRoleData();
-await showApp();
 
-await loadRoleData();
+                if (profile.role === "student") {
 
-await saveOfflineStudentCredentials(
-    studentId,
-    password,
-    user,
-    profile
-);
-if (
-    profile.role === "student"
-) {
+                    await saveOfflineStudentCredentials(
+                        studentId,
+                        password,
+                        user,
+                        profile
+                    );
 
-    try {
+                    try {
+                        await cacheStudentOfflineContent();
+                        await updateOfflineStudentSnapshot();
+                    } catch (error) {
 
-        await cacheStudentOfflineContent();
+                        console.warn(
+                            "⚠️ Offline content cache warm-up failed:",
+                            error
+                        );
 
-    } catch (error) {
+                    }
 
-        console.warn(
-            "⚠️ Offline content cache warm-up failed:",
-            error
-        );
+                }
 
-    }
-
-}
-
-await showApp();
-
-await render();
+                await showApp();
+                await render();
 
 
                 showToast(
@@ -14877,6 +15096,63 @@ async function render() {
 
 
 /* =========================================================
+   STUDENT ONLINE / OFFLINE SYNCHRONIZATION
+========================================================= */
+
+window.addEventListener(
+    "online",
+    () => {
+
+        console.log(
+            "🌐 Internet connection restored. Syncing student cache..."
+        );
+
+        scheduleStudentOfflineSync("connection-restored");
+
+    }
+);
+
+
+window.addEventListener(
+    "pageshow",
+    () => {
+
+        if (navigator.onLine) {
+            scheduleStudentOfflineSync("app-opened");
+        }
+
+    }
+);
+
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+
+        if (
+            document.visibilityState === "visible" &&
+            navigator.onLine
+        ) {
+            scheduleStudentOfflineSync("app-visible");
+        }
+
+    }
+);
+
+
+window.addEventListener(
+    "focus",
+    () => {
+
+        if (navigator.onLine) {
+            scheduleStudentOfflineSync("app-focus");
+        }
+
+    }
+);
+
+
+/* =========================================================
    START
 ========================================================= */
 
@@ -14891,6 +15167,13 @@ document.addEventListener(
         setupAuthListener();
 
         await initializeAuth();
+
+        if (
+            window.currentProfile?.role === "student" &&
+            navigator.onLine
+        ) {
+            scheduleStudentOfflineSync("startup");
+        }
 
         testSupabase();
 
