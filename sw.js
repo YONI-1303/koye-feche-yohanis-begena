@@ -1,11 +1,16 @@
-const CACHE_NAME = "kfy-begena-v7";
+const CACHE_NAME = "kfy-begena-v9";
 
 const APP_SHELL = [
     "./",
     "./index.html",
     "./styles.css",
-    "./app.js?v=210",
-    "./manifest.webmanifest"
+    "./app.js?v=212",
+    "./manifest.webmanifest",
+    "./images/begena/begena-hero.jpg",
+    "./images/begena/begena-mezmur.jpg",
+    "./images/begena/begena-tutor.jpg",
+    "./images/begena/begena-lessons.jpg",
+    "./images/begena/begena-login.jpg"
 ];
 
 const BEGENA_AUDIO_FILES = [

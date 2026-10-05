@@ -597,6 +597,178 @@ body {
 
 
 /* =========================================================
+   BEGENA VISUAL SYSTEM
+   ========================================================= */
+
+.begena-visual-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(280px, .88fr);
+    gap: 22px;
+    align-items: stretch;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.begena-visual-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 72% 20%, rgba(213,173,81,.12), transparent 28%),
+        linear-gradient(110deg, rgba(25,75,56,.92), rgba(20,37,30,.86));
+    z-index: -1;
+}
+
+.begena-hero-copy {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.begena-hero-copy .row {
+    margin-top: 8px;
+}
+
+.begena-hero-media {
+    position: relative;
+    min-height: 290px;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(241,207,120,.18);
+    box-shadow:
+        0 20px 45px rgba(0,0,0,.26),
+        inset 0 1px 0 rgba(255,255,255,.08);
+    background: #0a1711;
+}
+
+.begena-hero-media.compact {
+    min-height: 190px;
+    max-height: 220px;
+}
+
+.begena-hero-media img,
+.begena-tutor-hero-media img,
+.begena-lessons-image-strip img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.begena-hero-media img {
+    object-position: center 58%;
+    transform: scale(1.025);
+    transition: transform .55s ease, filter .35s ease;
+}
+
+.begena-visual-hero:hover .begena-hero-media img {
+    transform: scale(1.055);
+    filter: brightness(1.04) saturate(1.04);
+}
+
+.begena-image-glow {
+    position: absolute;
+    inset: auto -10% -30% 20%;
+    height: 75%;
+    background: radial-gradient(circle, rgba(241,207,120,.18), transparent 68%);
+    pointer-events: none;
+}
+
+.begena-section-hero {
+    grid-template-columns: minmax(0, 1fr) 250px;
+}
+
+.begena-section-hero .begena-hero-media.compact img {
+    object-position: center;
+}
+
+.begena-tutor-hero {
+    display: grid;
+    grid-template-columns: minmax(230px, .42fr) minmax(0, 1fr);
+    padding: 0 !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(213,173,81,.10), transparent 36%),
+        linear-gradient(180deg, rgba(20,43,34,.98), rgba(11,27,21,.98));
+}
+
+.begena-tutor-hero-media {
+    min-height: 270px;
+    overflow: hidden;
+    border-right: 1px solid rgba(255,255,255,.06);
+}
+
+.begena-tutor-hero-media img {
+    object-position: center;
+    transform: scale(1.02);
+    transition: transform .55s ease;
+}
+
+.begena-tutor-hero:hover .begena-tutor-hero-media img {
+    transform: scale(1.055);
+}
+
+.begena-tutor-hero-content {
+    min-width: 0;
+    padding: 22px 22px 20px;
+}
+
+.begena-tutor-hero-progress {
+    margin-top: 2px;
+}
+
+.begena-lessons-card {
+    overflow: hidden;
+}
+
+.begena-lessons-image-strip {
+    height: 116px;
+    margin: -18px -18px 17px;
+    overflow: hidden;
+    position: relative;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.begena-lessons-image-strip::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(7,19,14,.03), rgba(7,19,14,.84));
+}
+
+.begena-lessons-image-strip img {
+    object-position: center 62%;
+    filter: saturate(.96) contrast(1.03);
+}
+
+/* Login imagery */
+#login-page {
+    position: relative;
+    overflow: hidden;
+}
+
+#login-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 72% 30%, rgba(241,207,120,.16), transparent 25%),
+        linear-gradient(135deg, rgba(7,19,14,.20), rgba(7,19,14,.72));
+    pointer-events: none;
+}
+
+#login-page .login-card {
+    position: relative;
+    z-index: 2;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 30px 90px rgba(0,0,0,.44);
+}
+
+/* =========================================================
    HERO
    ========================================================= */
 
@@ -1174,6 +1346,37 @@ textarea {
 
 @media (max-width: 700px) {
 
+    .begena-visual-hero,
+    .begena-section-hero,
+    .begena-tutor-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .begena-hero-media {
+        min-height: 230px;
+    }
+
+    .begena-hero-media.compact {
+        min-height: 190px;
+        max-height: 230px;
+    }
+
+    .begena-tutor-hero-media {
+        min-height: 220px;
+        max-height: 255px;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+
+    .begena-tutor-hero-content {
+        padding: 18px;
+    }
+
+    .begena-lessons-image-strip {
+        height: 105px;
+        margin: -15px -15px 15px;
+    }
+
 
     .app-shell {
 
@@ -1385,22 +1588,8 @@ textarea {
     box-sizing: border-box;
 
     background:
-        radial-gradient(
-            circle at 15% 15%,
-            rgba(40, 116, 82, 0.28),
-            transparent 34%
-        ),
-        radial-gradient(
-            circle at 85% 85%,
-            rgba(213, 173, 81, 0.12),
-            transparent 30%
-        ),
-        linear-gradient(
-            135deg,
-            #040b08 0%,
-            #071812 45%,
-            #0a1c14 100%
-        );
+        linear-gradient(90deg, rgba(5, 15, 10, 0.78), rgba(5, 15, 10, 0.42)),
+        url("./images/begena/begena-login.jpg") center center / cover no-repeat;
 
     font-family:
         Inter,
@@ -2944,4 +3133,128 @@ textarea {
         width: 100%;
     }
 
+}
+/* =========================================================
+   MENTOR / TEACHER BEGENA VISUALS
+   ========================================================= */
+
+.mentor-begena-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.58fr);
+    gap: 20px;
+    align-items: stretch;
+    overflow: hidden;
+    padding: 0 !important;
+    background:
+        radial-gradient(circle at 95% 15%, rgba(213,173,81,.12), transparent 30%),
+        linear-gradient(145deg, rgba(20,55,40,.98), rgba(8,22,16,.98));
+}
+
+.mentor-begena-hero-copy {
+    padding: 26px 26px 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.mentor-begena-hero-copy h2 {
+    margin-top: 12px;
+}
+
+.mentor-begena-hero-media {
+    position: relative;
+    min-height: 245px;
+    overflow: hidden;
+    border-left: 1px solid rgba(255,255,255,.07);
+}
+
+.mentor-begena-hero-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(7,19,14,.20), rgba(7,19,14,.02));
+    pointer-events: none;
+}
+
+.mentor-begena-hero-media img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+    transform: scale(1.02);
+    transition: transform .55s ease, filter .35s ease;
+}
+
+.mentor-begena-hero:hover .mentor-begena-hero-media img {
+    transform: scale(1.055);
+    filter: brightness(1.03) saturate(1.04);
+}
+
+.mentor-page-visual-card {
+    overflow: hidden;
+}
+
+.mentor-page-visual-media {
+    height: 150px;
+    margin: -18px -18px 18px;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.mentor-page-visual-media img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+}
+
+.mentor-lessons-visual-card {
+    overflow: hidden;
+}
+
+.mentor-lessons-visual {
+    position: relative;
+    height: 128px;
+    margin: -18px -18px 18px;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.mentor-lessons-visual img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center 60%;
+}
+
+.mentor-lessons-visual-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(7,19,14,.04), rgba(7,19,14,.72));
+}
+
+.mentor-lessons-visual-label {
+    position: absolute;
+    left: 16px;
+    bottom: 12px;
+    color: rgba(255,255,255,.9);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.8px;
+}
+
+@media (max-width: 760px) {
+    .mentor-begena-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .mentor-begena-hero-media {
+        min-height: 210px;
+        border-left: 0;
+        border-top: 1px solid rgba(255,255,255,.07);
+    }
 }

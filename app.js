@@ -98,6 +98,23 @@ initializeSupabase();
 
 
 /* =========================================================
+   BEGENA VISUAL ASSETS
+   ---------------------------------------------------------
+   Local images keep the PWA beautiful and offline-friendly.
+========================================================= */
+
+const BEGENA_IMAGES = {
+
+    hero: "./images/begena/begena-hero.jpg",
+    mezmur: "./images/begena/begena-mezmur.jpg",
+    tutor: "./images/begena/begena-tutor.jpg",
+    lessons: "./images/begena/begena-lessons.jpg",
+    login: "./images/begena/begena-login.jpg"
+
+};
+
+
+/* =========================================================
    APP STATE
 ========================================================= */
 
@@ -200,6 +217,84 @@ function getTodayLocalDate() {
 
     return `${year}-${month}-${day}`;
 
+}
+
+
+/* =========================================================
+   ATTENDANCE SCHEDULE
+   ---------------------------------------------------------
+   Main class days: Saturday + Sunday
+   Optional student days: Tuesday + Wednesday
+========================================================= */
+
+function getAttendanceDayInfo(dateValue) {
+
+    if (!dateValue) {
+        return {
+            dayIndex: null,
+            dayName: "Unknown day",
+            type: "unknown",
+            label: "Choose a date",
+            icon: "🗓️"
+        };
+    }
+
+    const date =
+        new Date(`${dateValue}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+        return {
+            dayIndex: null,
+            dayName: "Invalid date",
+            type: "unknown",
+            label: "Invalid date",
+            icon: "⚠️"
+        };
+    }
+
+    const dayIndex =
+        date.getDay();
+
+    const days = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+    ];
+
+    const dayName =
+        days[dayIndex] || "Unknown day";
+
+    if (dayIndex === 0 || dayIndex === 6) {
+        return {
+            dayIndex,
+            dayName,
+            type: "main",
+            label: "Main class day",
+            icon: "⭐"
+        };
+    }
+
+    if (dayIndex === 2 || dayIndex === 3) {
+        return {
+            dayIndex,
+            dayName,
+            type: "optional",
+            label: "Optional student day",
+            icon: "🟡"
+        };
+    }
+
+    return {
+        dayIndex,
+        dayName,
+        type: "off",
+        label: "No regular class day",
+        icon: "ℹ️"
+    };
 }
 
 
@@ -2132,7 +2227,11 @@ async function finishCourse() {
 
     await render();
 }
-async function loadMentorAttendanceStudents(classId) {
+async function loadMentorAttendanceStudents(
+    classId,
+    attendanceDate = state.attendanceDate,
+    includeHistorical = false
+) {
 
     state.mentorAttendanceStudents = [];
 
@@ -2166,7 +2265,6 @@ async function loadMentorAttendanceStudents(classId) {
                     )
                 `)
                 .eq("class_id", classId)
-                .eq("status", "active")
                 .order("joined_at", {
                     ascending: true
                 });
@@ -2182,11 +2280,46 @@ async function loadMentorAttendanceStudents(classId) {
 
         }
 
+        const selectedDate =
+            attendanceDate ||
+            getTodayLocalDate();
+
+        const dateEnd =
+            new Date(`${selectedDate}T23:59:59`)
+                .getTime();
+
         state.mentorAttendanceStudents =
             (data || []).filter(
-                student =>
-                    student.profiles &&
-                    student.profiles.role === "student"
+                enrollment => {
+
+                    const profile =
+                        enrollment.profiles;
+
+                    if (
+                        !profile ||
+                        profile.role !== "student"
+                    ) {
+                        return false;
+                    }
+
+                    if (!includeHistorical) {
+                        return enrollment.status === "active";
+                    }
+
+                    if (!enrollment.joined_at) {
+                        return true;
+                    }
+
+                    const joinedAt =
+                        new Date(
+                            enrollment.joined_at
+                        ).getTime();
+
+                    return Number.isNaN(dateEnd) ||
+                        Number.isNaN(joinedAt) ||
+                        joinedAt <= dateEnd;
+
+                }
             );
 
         return state.mentorAttendanceStudents;
@@ -2203,6 +2336,7 @@ async function loadMentorAttendanceStudents(classId) {
     }
 
 }
+
 /* =========================================================
    LOAD MENTOR STUDENT LESSON PROGRESS
 ========================================================= */
@@ -3653,43 +3787,57 @@ function studentHome() {
 
     return `
 
-        <div class="hero">
+        <div class="hero begena-visual-hero">
 
-            <div class="pill gold">
-                ● የእኔ መለያ
+            <div class="begena-hero-copy">
+
+                <div class="pill gold">
+                    ● የእኔ መለያ
+                </div>
+
+                <h2>
+                    እንኳን ደህና መጣህ,
+                    ${name} 👋
+                </h2>
+
+                <p>
+                    ይህ የእርስዎ የበገና
+                    ትምህርት መድረክ ነው።
+                    ትምህርትዎን፣ ልምምድዎን
+                    እና እድገትዎን ከዚህ
+                    ማስተዳደር ይችላሉ።
+                </p>
+
+                <div class="row">
+
+                    <button
+                        type="button"
+                        class="btn primary"
+                        data-go="tutor"
+                    >
+                        🎓 ትምህርት ጀምር
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn secondary"
+                        data-go="begena"
+                    >
+                        🎻 በገና ሞክር
+                    </button>
+
+                </div>
+
             </div>
 
-            <h2>
-                እንኳን ደህና መጣህ,
-                ${name} 👋
-            </h2>
-
-            <p>
-                ይህ የእርስዎ የበገና
-                ትምህርት መድረክ ነው።
-                ትምህርትዎን፣ ልምምድዎን
-                እና እድገትዎን ከዚህ
-                ማስተዳደር ይችላሉ።
-            </p>
-
-            <div class="row">
-
-                <button
-                    type="button"
-                    class="btn primary"
-                    data-go="tutor"
+            <div class="begena-hero-media">
+                <img
+                    src="${BEGENA_IMAGES.hero}"
+                    alt="Aesthetic Begena instrument photograph"
+                    loading="eager"
+                    decoding="async"
                 >
-                    🎓 ትምህርት ጀምር
-                </button>
-
-                <button
-                    type="button"
-                    class="btn secondary"
-                    data-go="begena"
-                >
-                    🎻 በገና ሞክር
-                </button>
-
+                <div class="begena-image-glow"></div>
             </div>
 
         </div>
@@ -4079,23 +4227,34 @@ function mentorDashboard() {
 
     return `
 
-        <div class="hero">
+        <div class="hero mentor-begena-hero">
 
-            <div class="pill gold">
-                ${roleLabel}
+            <div class="mentor-begena-hero-copy">
+                <div class="pill gold">
+                    ${roleLabel}
+                </div>
+
+                <h2>
+                    እንኳን ደህና መጡ,
+                    ${name}
+                </h2>
+
+                <p>
+                    የበገና ትምህርትን፣
+                    ክፍልን እና
+                    ክትትልን
+                    ከአንድ ቦታ ያስተዳድሩ።
+                </p>
             </div>
 
-            <h2>
-                እንኳን ደህና መጡ,
-                ${name}
-            </h2>
-
-            <p>
-                የበገና ትምህርትን፣
-                ክፍልን እና
-                ክትትልን
-                ከአንድ ቦታ ያስተዳድሩ።
-            </p>
+            <div class="mentor-begena-hero-media">
+                <img
+                    src="${BEGENA_IMAGES.hero}"
+                    alt="Begena instrument"
+                    loading="eager"
+                    decoding="async"
+                >
+            </div>
 
         </div>
 
@@ -4278,15 +4437,26 @@ function mentorClassesPage() {
 
     return `
 
-        <div class="card">
+        <div class="card mentor-page-visual-card">
 
-            <h3>
-                🏫 የበገና ክፍል
-            </h3>
+            <div class="mentor-page-visual-media">
+                <img
+                    src="${BEGENA_IMAGES.tutor}"
+                    alt="Begena instrument for the class page"
+                    loading="lazy"
+                    decoding="async"
+                >
+            </div>
 
-            <div class="muted">
-                የአስተማሪው የተመደበ
-                ክፍል
+            <div class="mentor-page-visual-content">
+                <h3>
+                    🏫 የበገና ክፍል
+                </h3>
+
+                <div class="muted">
+                    የአስተማሪው የተመደበ
+                    ክፍል
+                </div>
             </div>
 
 
@@ -4659,6 +4829,55 @@ async function mentorAttendancePage() {
     const classroom =
         state.mentorClasses[0];
 
+    const selectedDate =
+        state.attendanceDate ||
+        getTodayLocalDate();
+
+    const dayInfo =
+        getAttendanceDayInfo(selectedDate);
+
+    const attendanceStudents =
+        state.mentorAttendanceStudents || [];
+
+    const attendanceStatuses =
+        state.mentorAttendanceStatuses || {};
+
+    const summary =
+        attendanceStudents.reduce(
+            (counts, student) => {
+
+                const status =
+                    attendanceStatuses[
+                        student.student_id
+                    ]?.status;
+
+                if (status === "present") {
+                    counts.present += 1;
+                } else if (status === "late") {
+                    counts.late += 1;
+                } else if (status === "absent") {
+                    counts.absent += 1;
+                } else if (status === "excused") {
+                    counts.excused += 1;
+                } else {
+                    counts.unmarked += 1;
+                }
+
+                return counts;
+
+            },
+            {
+                present: 0,
+                late: 0,
+                absent: 0,
+                excused: 0,
+                unmarked: 0
+            }
+        );
+
+    const dateIsToday =
+        selectedDate === getTodayLocalDate();
+
 
     return `
 
@@ -4679,17 +4898,33 @@ async function mentorAttendancePage() {
                 </div>
 
 
-                <div class="row">
+                <div
+                    class="row"
+                    style="
+                        gap:8px;
+                        flex-wrap:wrap;
+                        justify-content:flex-end;
+                    "
+                >
 
                     <input
                         id="attendance-date"
                         type="date"
-                        value="${state.attendanceDate}"
+                        value="${selectedDate}"
+                        aria-label="Attendance date"
                         style="
                             width:auto;
                             min-width:150px;
                         "
                     >
+
+                    <button
+                        type="button"
+                        class="btn secondary"
+                        id="load-attendance-date"
+                    >
+                        🔎 Load date
+                    </button>
 
                     <button
                         type="button"
@@ -4701,6 +4936,71 @@ async function mentorAttendancePage() {
 
                 </div>
 
+            </div>
+
+            <div
+                class="card"
+                style="
+                    margin-top:16px;
+                    border:1px solid rgba(212,175,55,.28);
+                "
+            >
+                <div
+                    class="row space"
+                    style="gap:12px; flex-wrap:wrap;"
+                >
+                    <div>
+                        <b>
+                            ${dayInfo.icon} ${escapeHtml(dayInfo.dayName)}
+                        </b>
+                        <div class="muted">
+                            ${escapeHtml(dayInfo.label)} · ${escapeHtml(formatDate(selectedDate))}
+                        </div>
+                    </div>
+                    <div class="pill gold">
+                        📅 ${dateIsToday ? "Today" : "Selected date"}
+                    </div>
+                </div>
+                <div
+                    class="muted"
+                    style="margin-top:8px;"
+                >
+                    ⭐ Saturday + Sunday are the main class days. 🟡 Tuesday + Wednesday are available for students who can attend then. Other dates are review-only unless you have a special session.
+                </div>
+            </div>
+
+            <div
+                style="
+                    display:grid;
+                    grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+                    gap:12px;
+                    margin-top:16px;
+                "
+            >
+                <div class="card">
+                    <div class="muted">👥 Students</div>
+                    <div class="big gold">${attendanceStudents.length}</div>
+                </div>
+                <div class="card">
+                    <div class="muted">✅ Present</div>
+                    <div class="big gold">${summary.present}</div>
+                </div>
+                <div class="card">
+                    <div class="muted">🟡 Late</div>
+                    <div class="big gold">${summary.late}</div>
+                </div>
+                <div class="card">
+                    <div class="muted">❌ Absent</div>
+                    <div class="big gold">${summary.absent}</div>
+                </div>
+                <div class="card">
+                    <div class="muted">🟢 Excused</div>
+                    <div class="big gold">${summary.excused}</div>
+                </div>
+                <div class="card">
+                    <div class="muted">⏳ Not marked</div>
+                    <div class="big gold">${summary.unmarked}</div>
+                </div>
             </div>
 
 
@@ -4741,9 +5041,9 @@ async function mentorAttendancePage() {
 >
 
                 ${
-                    state.mentorAttendanceStudents.length
+                    attendanceStudents.length
 
-                        ? state.mentorAttendanceStudents
+                        ? attendanceStudents
                             .map(
                                 student => {
 
@@ -4758,7 +5058,12 @@ async function mentorAttendancePage() {
 
                                     const currentStatus =
                                         existing?.status ||
-                                        "present";
+                                        (dateIsToday
+                                            ? "present"
+                                            : "");
+
+                                    const previousStudent =
+                                        student.status !== "active";
 
 
                                     return `
@@ -4800,6 +5105,19 @@ async function mentorAttendancePage() {
 
                                                     </div>
 
+                                                    ${
+                                                        previousStudent
+                                                            ? `
+                                                                <span
+                                                                    class="pill"
+                                                                    style="margin-top:6px; display:inline-block;"
+                                                                >
+                                                                    🕘 Previous student
+                                                                </span>
+                                                            `
+                                                            : ""
+                                                    }
+
                                                 </div>
 
 
@@ -4809,6 +5127,17 @@ async function mentorAttendancePage() {
                                                         student.student_id
                                                     }"
                                                 >
+
+                                                    <option
+                                                        value=""
+                                                        ${
+                                                            currentStatus === ""
+                                                                ? "selected"
+                                                                : ""
+                                                        }
+                                                    >
+                                                        ⏳ Not marked
+                                                    </option>
 
                                                     <option
                                                         value="present"
@@ -4938,7 +5267,9 @@ async function prepareMentorAttendance() {
 
 
     await loadMentorAttendanceStudents(
-        classId
+        classId,
+        state.attendanceDate,
+        true
     );
 
 
@@ -5079,7 +5410,21 @@ async function saveAttendance() {
                         null
 
                 })
+            )
+            .filter(
+                record => Boolean(record.status)
             );
+
+
+    if (!records.length) {
+
+        showToast(
+            "⚠️ No attendance is marked for this date yet."
+        );
+
+        return;
+
+    }
 
 
     const button =
@@ -5780,15 +6125,30 @@ async function mezmurPage() {
 
             <!-- HEADER -->
 
-            <div class="hero">
+            <div class="hero begena-visual-hero begena-section-hero">
 
-                <h2>
-                    🎵 መዝሙር
-                </h2>
+                <div class="begena-hero-copy">
+                    <div class="pill gold">
+                        🎵 BEGENA • MEZMUR
+                    </div>
 
-                <p>
-                    የተጨመሩ መዝሙሮችን ይማሩ።
-                </p>
+                    <h2>
+                        🎵 መዝሙር
+                    </h2>
+
+                    <p>
+                        የተጨመሩ መዝሙሮችን ይማሩ።
+                    </p>
+                </div>
+
+                <div class="begena-hero-media compact">
+                    <img
+                        src="${BEGENA_IMAGES.mezmur}"
+                        alt="Begena instrument for Mezmur learning"
+                        loading="lazy"
+                        decoding="async"
+                    >
+                </div>
 
             </div>
 
@@ -8743,7 +9103,20 @@ function mentorLessonsPage() {
 
     return `
 
-        <div class="card">
+        <div class="card mentor-lessons-visual-card">
+
+            <div class="mentor-lessons-visual">
+                <img
+                    src="${BEGENA_IMAGES.lessons}"
+                    alt="Begena instrument for lessons"
+                    loading="lazy"
+                    decoding="async"
+                >
+                <div class="mentor-lessons-visual-overlay"></div>
+                <div class="mentor-lessons-visual-label">
+                    BEGENA • LESSONS
+                </div>
+            </div>
 
             <div class="row space">
 
@@ -10848,42 +11221,53 @@ async function kfyTutorPage() {
         : 0;
 
     return `
-        <div class="card" style="
+        <div class="card begena-tutor-hero" style="
             margin-bottom:18px;
             overflow:hidden;
             position:relative;
         ">
-            <div style="
-                display:flex;
-                align-items:flex-start;
-                justify-content:space-between;
-                gap:18px;
-                flex-wrap:wrap;
-            ">
-                <div>
-                    <div class="muted" style="margin-bottom:6px;">
-                        🎓 Begena Class • Level ${kfyEscapeHtml(
-                            state.currentClass?.level ?? 1
-                        )}
-                    </div>
-
-                    <h2 style="margin:0 0 8px;">
-                        በገና ትምህርት
-                    </h2>
-
-                    <div class="muted">
-                        Learn step by step and keep your progress.
-                    </div>
-                </div>
-
-                <div class="pill gold">
-                    <span id="kfy-tutor-completed-count">
-                        ${completedCount}
-                    </span>
-                    / ${totalCount} Completed
-                </div>
+            <div class="begena-tutor-hero-media">
+                <img
+                    src="${BEGENA_IMAGES.tutor}"
+                    alt="Begena instrument for tutor lessons"
+                    loading="lazy"
+                    decoding="async"
+                >
             </div>
 
+            <div class="begena-tutor-hero-content">
+                <div style="
+                    display:flex;
+                    align-items:flex-start;
+                    justify-content:space-between;
+                    gap:18px;
+                    flex-wrap:wrap;
+                ">
+                    <div>
+                        <div class="muted" style="margin-bottom:6px;">
+                            🎓 Begena Class • Level ${kfyEscapeHtml(
+                                state.currentClass?.level ?? 1
+                            )}
+                        </div>
+
+                        <h2 style="margin:0 0 8px;">
+                            በገና ትምህርት
+                        </h2>
+
+                        <div class="muted">
+                            Learn step by step and keep your progress.
+                        </div>
+                    </div>
+
+                    <div class="pill gold">
+                        <span id="kfy-tutor-completed-count">
+                            ${completedCount}
+                        </span>
+                        / ${totalCount} Completed
+                    </div>
+                </div>
+
+            <div class="begena-tutor-hero-progress">
             <div style="margin-top:20px;">
                 <div style="
                     display:flex;
@@ -10920,9 +11304,19 @@ async function kfyTutorPage() {
                     ></div>
                 </div>
             </div>
+            </div>
         </div>
 
-        <div class="card">
+        <div class="card begena-lessons-card">
+            <div class="begena-lessons-image-strip">
+                <img
+                    src="${BEGENA_IMAGES.lessons}"
+                    alt="Begena instrument"
+                    loading="lazy"
+                    decoding="async"
+                >
+            </div>
+
             <div style="
                 display:flex;
                 justify-content:space-between;
@@ -12977,6 +13371,46 @@ function setupTeacherSearch(
     );
 
 }
+async function loadMentorAttendanceSelectedDate() {
+
+    const input =
+        get("attendance-date");
+
+    const selectedDate =
+        input?.value?.trim();
+
+    if (!selectedDate) {
+        showToast(
+            "⚠️ Choose an attendance date."
+        );
+        return;
+    }
+
+    state.attendanceDate =
+        selectedDate;
+
+    const button =
+        get("load-attendance-date");
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Loading...";
+    }
+
+    try {
+        await render();
+    } finally {
+        const refreshedButton =
+            get("load-attendance-date");
+
+        if (refreshedButton) {
+            refreshedButton.disabled = false;
+            refreshedButton.textContent = "🔎 Load date";
+        }
+    }
+}
+
+
 function bindPageActions() {
     setupTeacherSearch(
     "teacher-students-search",
@@ -12993,6 +13427,26 @@ setupTeacherSearch(
     "teacher-leaderboard-search-button",
     "#teacher-leaderboard-list .list-item"
 );
+
+    const attendanceDateInput =
+        get("attendance-date");
+
+    const loadAttendanceDateButton =
+        get("load-attendance-date");
+
+    if (loadAttendanceDateButton) {
+        loadAttendanceDateButton.addEventListener(
+            "click",
+            loadMentorAttendanceSelectedDate
+        );
+    }
+
+    if (attendanceDateInput) {
+        attendanceDateInput.addEventListener(
+            "change",
+            loadMentorAttendanceSelectedDate
+        );
+    }
 
     const changePasswordForm = get("change-password-form");
 
