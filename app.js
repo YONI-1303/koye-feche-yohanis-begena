@@ -10693,8 +10693,7 @@ function autoCorrelate(buffer, sampleRate) {
 }
 
 
-let mekagnaToneContext = null;
-let mekagnaToneOscillator = null;
+let mekagnaReferenceAudio = null;
 
 async function playMekagnaReferenceTone(stringNumber) {
     const target = getMekagnaTargets().find(
@@ -10706,51 +10705,50 @@ async function playMekagnaReferenceTone(stringNumber) {
         return;
     }
 
+    // Map the displayed target note to the matching recording filename:
+    // F2 -> bf2.ogg, C2 -> bc2.ogg, C#2 -> bcs2.ogg, F#2 -> bfs2.ogg.
+    const noteForFile = target.note.toLowerCase().replace("#", "s");
+    const filename = `b${noteForFile}.ogg`;
+    const audioUrl = new URL(
+        `./audio/begena/begena_audio/${filename}`,
+        document.baseURI
+    ).href;
+
+    // Stop the previous recording when another Play tone button is clicked.
+    if (mekagnaReferenceAudio) {
+        mekagnaReferenceAudio.pause();
+        mekagnaReferenceAudio.currentTime = 0;
+        mekagnaReferenceAudio = null;
+    }
+
+    const audio = new Audio(audioUrl);
+    mekagnaReferenceAudio = audio;
+    audio.preload = "auto";
+    audio.volume = 1.0;
+
+    audio.addEventListener("ended", () => {
+        if (mekagnaReferenceAudio === audio) {
+            mekagnaReferenceAudio = null;
+        }
+    }, { once: true });
+
+    audio.addEventListener("error", () => {
+        console.error("Could not load Begena recording:", audioUrl, audio.error);
+        if (mekagnaReferenceAudio === audio) {
+            mekagnaReferenceAudio = null;
+        }
+        showToast(`Could not load ${filename}. Check the audio file path.`);
+    }, { once: true });
+
     try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) {
-            showToast("Reference tones are not supported in this browser.");
-            return;
-        }
-
-        if (!mekagnaToneContext || mekagnaToneContext.state === "closed") {
-            mekagnaToneContext = new AudioContextClass();
-        }
-        if (mekagnaToneContext.state === "suspended") {
-            await mekagnaToneContext.resume();
-        }
-
-        if (mekagnaToneOscillator) {
-            try { mekagnaToneOscillator.stop(); } catch (error) {}
-            mekagnaToneOscillator = null;
-        }
-
-        const oscillator = mekagnaToneContext.createOscillator();
-        const gain = mekagnaToneContext.createGain();
-        const now = mekagnaToneContext.currentTime;
-
-        oscillator.type = "sine";
-        oscillator.frequency.setValueAtTime(target.frequency, now);
-        gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.exponentialRampToValueAtTime(0.12, now + 0.035);
-        gain.gain.setValueAtTime(0.12, now + 0.75);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.05);
-        oscillator.connect(gain);
-        gain.connect(mekagnaToneContext.destination);
-        oscillator.onended = () => {
-            if (mekagnaToneOscillator === oscillator) {
-                mekagnaToneOscillator = null;
-            }
-            try { oscillator.disconnect(); } catch (error) {}
-            try { gain.disconnect(); } catch (error) {}
-        };
-        mekagnaToneOscillator = oscillator;
-        oscillator.start(now);
-        oscillator.stop(now + 1.08);
-        showToast(`🎵 String ${target.stringNumber}: ${target.note} (${target.frequency.toFixed(2)} Hz)`);
+        await audio.play();
+        showToast(`🎻 Playing ${target.note} — ${filename}`);
     } catch (error) {
-        console.error("Mekagna reference tone failed:", error);
-        showToast("Could not play the reference tone. Try tapping again.");
+        console.error("Begena recording playback failed:", audioUrl, error);
+        if (mekagnaReferenceAudio === audio) {
+            mekagnaReferenceAudio = null;
+        }
+        showToast(`Could not play ${filename}. Check the audio folder and browser console.`);
     }
 }
 

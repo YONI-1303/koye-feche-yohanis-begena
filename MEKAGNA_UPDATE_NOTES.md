@@ -26,3 +26,11 @@ These mappings are transcribed from the supplied reference app where available. 
 ## Deployment notes
 
 The tuning configuration is local JavaScript, so no Supabase table/schema migration is required. The existing authentication/profile role determines which navigation menu is shown. Microphone pitch detection needs HTTPS (such as the deployed site) or localhost and the browser must be granted microphone permission.
+
+
+## Real audio playback update
+
+- Mekagna Play tone buttons now play the matching recording from `audio/begena/begena_audio/` rather than generating an oscillator tone.
+- Example: F2 plays `bf2.ogg`; C2 plays `bc2.ogg`; C♯2 plays `bcs2.ogg`; F♯2 plays `bfs2.ogg`.
+- Updated the app script query to `v214` and service-worker cache to `kfy-begena-v11`.
+- Added all available shared reference recordings to the service-worker precache for offline playback.

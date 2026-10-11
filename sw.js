@@ -1,10 +1,10 @@
-const CACHE_NAME = "kfy-begena-v10";
+const CACHE_NAME = "kfy-begena-v11";
 
 const APP_SHELL = [
     "./",
     "./index.html",
     "./styles.css",
-    "./app.js?v=213",
+    "./app.js?v=214",
     "./manifest.webmanifest",
     "./images/begena/begena-hero.jpg",
     "./images/begena/begena-mezmur.jpg",
@@ -14,6 +14,25 @@ const APP_SHELL = [
 ];
 
 const BEGENA_AUDIO_FILES = [
+    "./audio/begena/begena_audio/ba2.ogg",
+    "./audio/begena/begena_audio/bas2.ogg",
+    "./audio/begena/begena_audio/bb2.ogg",
+    "./audio/begena/begena_audio/bc2.ogg",
+    "./audio/begena/begena_audio/bc3.ogg",
+    "./audio/begena/begena_audio/bcs2.ogg",
+    "./audio/begena/begena_audio/bcs3.ogg",
+    "./audio/begena/begena_audio/bd2.ogg",
+    "./audio/begena/begena_audio/bd3.ogg",
+    "./audio/begena/begena_audio/bds2.ogg",
+    "./audio/begena/begena_audio/bds3.ogg",
+    "./audio/begena/begena_audio/be2.ogg",
+    "./audio/begena/begena_audio/be3.ogg",
+    "./audio/begena/begena_audio/bf2.ogg",
+    "./audio/begena/begena_audio/bf3.ogg",
+    "./audio/begena/begena_audio/bfs2.ogg",
+    "./audio/begena/begena_audio/bg2.ogg",
+    "./audio/begena/begena_audio/bgs2.ogg",
+
     "./audio/begena/selamta/bf2.ogg",
     "./audio/begena/selamta/bc2.ogg",
     "./audio/begena/selamta/bd2.ogg",
