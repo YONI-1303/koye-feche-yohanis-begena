@@ -130,6 +130,13 @@ const state = {
 
     selectedString: null,
 
+    // Mekagna settings are separate from the Begena practice preset.
+    selectedMekagnaKignet: "Selamta",
+
+    selectedMajor: "C",
+
+    selectedMekagnaString: 1,
+
     listening: false,
 
     currentClass: null,
@@ -3379,6 +3386,14 @@ const mentorNavigation = [
         am: "ክትትል",
         en: "Attendance"
     },
+
+    {
+        id: "tuner",
+        icon: "🎼",
+        am: "መቃኛ",
+        en: "Mekagna"
+    },
+
     {
     id: "mezmur",
     icon: "🎵",
@@ -5700,136 +5715,230 @@ const strings =
    MEKAGNA
 ========================================================= */
 
-function tunerPage() {
+/* =========================================================
+   MEKAGNA TARGETS
+   ---------------------------------------------------------
+   The reference APK has six kignets. The interval patterns below
+   reproduce the five string targets (strings 1, 4, 6, 8 and 10)
+   as the selected major/root changes. Tizita is retained from the
+   existing web app's Begena sample map.
+========================================================= */
 
-    return `
+const MEKAGNA_KIGNET_INTERVALS = Object.freeze({
+    "Selamta":      { labelAm: "ሰላምታ", intervals: [5, 0, 2, 9, 7] },
+    "Tizita":       { labelAm: "ትዝታ", intervals: [4, 0, 2, 9, 7] },
+    "Wanen":        { labelAm: "ዋኔን", intervals: [4, 0, 2, 9, 7] },
+    "Sile Chernet": { labelAm: "ስለ ቸርነትህ", intervals: [5, 0, 1, 9, 6] },
+    "Ambasel":      { labelAm: "አምባሰል", intervals: [5, 0, 1, 9, 7] },
+    "Nusus Wanen":  { labelAm: "ንዑስ ዋኔን", intervals: [3, 0, 2, 9, 7] },
+    "Bati":         { labelAm: "ባቲ", intervals: [5, 0, 4, 11, 7] }
+});
 
-        <div class="grid two">
+// These are the major/root choices exposed in the reference tuner.
+const MEKAGNA_MAJORS = Object.freeze([
+    { label: "C Major", note: "C", semitones: 0 },
+    { label: "C♯ Major", note: "C#", semitones: 1 },
+    { label: "D Major", note: "D", semitones: 2 },
+    { label: "D♯ Major", note: "D#", semitones: 3 },
+    { label: "E Major", note: "E", semitones: 4 },
+    { label: "F Major", note: "F", semitones: 5 },
+    { label: "F♯ Major", note: "F#", semitones: 6 }
+]);
 
-            <div class="card">
+const MEKAGNA_STRING_NUMBERS = Object.freeze([1, 4, 6, 8, 10]);
+const MEKAGNA_NOTE_NAMES = Object.freeze([
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+]);
 
-                <h3>
-                    🎼 መቃኛ — Mekagna
-                </h3>
-
-                <div class="muted">
-                    Voice / Pitch Detector
-                </div>
-
-                <div
-                    style="
-                        width:220px;
-                        height:220px;
-                        margin:30px auto;
-                        border-radius:50%;
-                        display:grid;
-                        place-items:center;
-                        background:
-                        conic-gradient(
-                            #203f31 0 15%,
-                            #d5ad51 15% 18%,
-                            #203f31 18% 82%,
-                            #d5ad51 82% 85%,
-                            #203f31 85%
-                        );
-                    "
-                >
-
-                    <div style="text-align:center;">
-
-                        <div
-                            class="big"
-                            id="detected-note"
-                            style="font-size:44px;"
-                        >
-                            C#2
-                        </div>
-
-                        <div class="muted">
-                            <span id="frequency">
-                                69.30
-                            </span>
-                            Hz
-                        </div>
-
-                        <div class="gold">
-                            <span id="cents">
-                                +0
-                            </span>
-                            cents
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <button
-    type="button"
-    class="btn primary"
-    id="listen-button"
->
-    🎙️ ማዳመጥ
-</button>
-
-            </div>
-
-
-            <div class="card">
-
-                <h3>
-                    🎻 የበገና መቃኛ
-                </h3>
-
-                <div class="list">
-
-                    <div class="list-item">
-
-                        <b>
-                            Preset
-                        </b>
-
-                        <div
-                            class="muted"
-                            id="tuner-preset"
-                        >
-                            Selamta
-                        </div>
-
-                    </div>
-
-
-                    <div class="list-item">
-
-                        <b>
-                            Target
-                        </b>
-
-                        <div
-                            class="big gold"
-                            id="tuner-target-note"
-                        >
-                            C#2
-                        </div>
-
-                        <div
-                            class="muted"
-                            id="tuner-target-frequency"
-                        >
-                            69.30 Hz
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    `;
-
+function mekagnaMidiToNote(midi) {
+    const noteNumber = Math.round(Number(midi));
+    const noteName = MEKAGNA_NOTE_NAMES[((noteNumber % 12) + 12) % 12];
+    const octave = Math.floor(noteNumber / 12) - 1;
+    return `${noteName}${octave}`;
 }
 
+function mekagnaMidiToFrequency(midi) {
+    return 440 * Math.pow(2, (Number(midi) - 69) / 12);
+}
+
+function getMekagnaTargets() {
+    const preset = MEKAGNA_KIGNET_INTERVALS[state.selectedMekagnaKignet]
+        ? state.selectedMekagnaKignet
+        : "Selamta";
+    const presetData = MEKAGNA_KIGNET_INTERVALS[preset];
+    const major = MEKAGNA_MAJORS.find(item => item.note === state.selectedMajor)
+        || MEKAGNA_MAJORS[0];
+    const rootMidi = 36 + major.semitones; // C2 is MIDI note 36.
+
+    return MEKAGNA_STRING_NUMBERS.map((stringNumber, index) => {
+        const interval = presetData.intervals[index];
+        const midi = rootMidi + interval;
+        const frequency = mekagnaMidiToFrequency(midi);
+        return {
+            stringNumber,
+            interval,
+            midi,
+            note: mekagnaMidiToNote(midi),
+            frequency
+        };
+    });
+}
+
+function getMekagnaSelectedTarget() {
+    const targets = getMekagnaTargets();
+    return targets.find(target => target.stringNumber === Number(state.selectedMekagnaString))
+        || targets[0];
+}
+
+/* =========================================================
+   MEKAGNA PAGE
+========================================================= */
+
+function tunerPage() {
+    const kignet = MEKAGNA_KIGNET_INTERVALS[state.selectedMekagnaKignet]
+        ? state.selectedMekagnaKignet
+        : "Selamta";
+    const major = MEKAGNA_MAJORS.find(item => item.note === state.selectedMajor)
+        || MEKAGNA_MAJORS[0];
+    const targets = getMekagnaTargets();
+    const selectedTarget = getMekagnaSelectedTarget();
+
+    const kignetOptions = Object.entries(MEKAGNA_KIGNET_INTERVALS)
+        .map(([value, info]) => `
+            <option value="${value}" ${value === kignet ? "selected" : ""}>
+                ${info.labelAm} — ${value}
+            </option>
+        `).join("");
+
+    const majorOptions = MEKAGNA_MAJORS
+        .map(item => `
+            <option value="${item.note}" ${item.note === major.note ? "selected" : ""}>
+                ${item.label}
+            </option>
+        `).join("");
+
+    const stringTargets = targets.map(target => {
+        const isSelected = target.stringNumber === selectedTarget.stringNumber;
+        return `
+            <article class="mekagna-target-tile ${isSelected ? "is-selected" : ""}">
+                <button
+                    type="button"
+                    class="mekagna-string-select"
+                    data-mekagna-string="${target.stringNumber}"
+                    aria-pressed="${isSelected ? "true" : "false"}"
+                    aria-label="Select string ${target.stringNumber}, target ${target.note}"
+                >
+                    <span class="mekagna-string-label">String ${target.stringNumber}</span>
+                    <strong class="mekagna-string-note">${target.note}</strong>
+                    <span class="mekagna-string-frequency">${target.frequency.toFixed(2)} Hz</span>
+                    <span class="mekagna-string-action">${isSelected ? "Selected target" : "Tap to tune"}</span>
+                </button>
+                <button
+                    type="button"
+                    class="mekagna-play-tone"
+                    data-mekagna-play="${target.stringNumber}"
+                    aria-label="Play reference tone for string ${target.stringNumber}"
+                >▶ Play tone</button>
+            </article>
+        `;
+    }).join("");
+
+    return `
+        <div class="mekagna-page">
+            <section class="card mekagna-header-card">
+                <div class="mekagna-intro">
+                    <span class="mekagna-eyebrow">BEGENA · STRING-BY-STRING TUNING</span>
+                    <h2>🎼 መቃኛ — Mekagna</h2>
+                    <p>
+                        Choose a <b>kignet</b>, then a <b>major</b>. The target pitch for strings
+                        1, 4, 6, 8 and 10 updates automatically, so you can tune one string at a time.
+                    </p>
+                </div>
+                <div class="mekagna-controls">
+                    <label for="mekagna-kignet-select">Kignet / ቅኝት</label>
+                    <select id="mekagna-kignet-select" name="mekagna-kignet">
+                        ${kignetOptions}
+                    </select>
+                    <label for="mekagna-major-select">Major / ሜጀር</label>
+                    <select id="mekagna-major-select" name="mekagna-major">
+                        ${majorOptions}
+                    </select>
+                    <p class="mekagna-selection-note">
+                        Selected: <b>${kignet}</b> · <b>${major.label}</b>
+                    </p>
+                </div>
+            </section>
+
+            <div class="grid two mekagna-main-grid">
+                <section class="card mekagna-live-card">
+                    <div class="mekagna-panel-heading">
+                        <div>
+                            <span class="mekagna-eyebrow">LIVE PITCH</span>
+                            <h3>🎙️ Tune your Begena</h3>
+                        </div>
+                        <span id="mekagna-tuning-status" class="mekagna-tuning-status ready" aria-live="polite">
+                            Ready to tune
+                        </span>
+                    </div>
+
+                    <div class="mekagna-note-orb">
+                        <div id="detected-note" class="mekagna-detected-note">--</div>
+                        <div class="mekagna-detected-frequency">
+                            <span id="frequency">--</span> Hz
+                        </div>
+                        <div class="mekagna-cents-line">
+                            <span id="cents">--</span> cents from target
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn primary mekagna-listen-button" id="listen-button">
+                        ${mekagnaListening ? "⏹️ Stop listening" : "🎙️ Start listening"}
+                    </button>
+                    <p class="mekagna-mic-help">
+                        Start listening, then pluck only the string you are tuning. A negative cent value
+                        means the pitch is low; a positive value means it is high.
+                    </p>
+
+                    <div class="mekagna-selected-target">
+                        <div>
+                            <span class="mekagna-muted-label">CURRENT TARGET</span>
+                            <strong id="mekagna-current-string">String ${selectedTarget.stringNumber}</strong>
+                        </div>
+                        <div class="mekagna-current-note">
+                            <strong id="tuner-target-note">${selectedTarget.note}</strong>
+                            <span id="tuner-target-frequency">${selectedTarget.frequency.toFixed(2)} Hz</span>
+                        </div>
+                    </div>
+                    <div class="mekagna-preset-meta">
+                        <span>Preset</span>
+                        <b id="tuner-preset">${kignet}</b>
+                        <span>Major</span>
+                        <b id="tuner-major">${major.label}</b>
+                    </div>
+                </section>
+
+                <section class="card mekagna-targets-card">
+                    <div class="mekagna-panel-heading">
+                        <div>
+                            <span class="mekagna-eyebrow">YOUR TARGET NOTES</span>
+                            <h3>🎻 String targets</h3>
+                        </div>
+                        <span class="mekagna-target-count">5 strings</span>
+                    </div>
+                    <p class="mekagna-targets-help">
+                        Select the string you are tuning. Use <b>Play tone</b> to hear its reference pitch.
+                    </p>
+                    <div class="mekagna-target-grid">
+                        ${stringTargets}
+                    </div>
+                    <p class="mekagna-footnote">
+                        Reference frequencies use standard equal-tempered note names; your selected kignet and major determine each target.
+                    </p>
+                </section>
+            </div>
+        </div>
+    `;
+}
 
 /* =========================================================
    MEZMUR
@@ -10185,6 +10294,14 @@ async function renderPage() {
                 break;
 
 
+            case "tuner":
+
+                html =
+                    tunerPage();
+
+                break;
+
+
             case "assignments":
 
                 html =
@@ -10576,6 +10693,67 @@ function autoCorrelate(buffer, sampleRate) {
 }
 
 
+let mekagnaToneContext = null;
+let mekagnaToneOscillator = null;
+
+async function playMekagnaReferenceTone(stringNumber) {
+    const target = getMekagnaTargets().find(
+        item => item.stringNumber === Number(stringNumber)
+    );
+
+    if (!target) {
+        showToast("Choose a valid Begena string first.");
+        return;
+    }
+
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+            showToast("Reference tones are not supported in this browser.");
+            return;
+        }
+
+        if (!mekagnaToneContext || mekagnaToneContext.state === "closed") {
+            mekagnaToneContext = new AudioContextClass();
+        }
+        if (mekagnaToneContext.state === "suspended") {
+            await mekagnaToneContext.resume();
+        }
+
+        if (mekagnaToneOscillator) {
+            try { mekagnaToneOscillator.stop(); } catch (error) {}
+            mekagnaToneOscillator = null;
+        }
+
+        const oscillator = mekagnaToneContext.createOscillator();
+        const gain = mekagnaToneContext.createGain();
+        const now = mekagnaToneContext.currentTime;
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(target.frequency, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + 0.035);
+        gain.gain.setValueAtTime(0.12, now + 0.75);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.05);
+        oscillator.connect(gain);
+        gain.connect(mekagnaToneContext.destination);
+        oscillator.onended = () => {
+            if (mekagnaToneOscillator === oscillator) {
+                mekagnaToneOscillator = null;
+            }
+            try { oscillator.disconnect(); } catch (error) {}
+            try { gain.disconnect(); } catch (error) {}
+        };
+        mekagnaToneOscillator = oscillator;
+        oscillator.start(now);
+        oscillator.stop(now + 1.08);
+        showToast(`🎵 String ${target.stringNumber}: ${target.note} (${target.frequency.toFixed(2)} Hz)`);
+    } catch (error) {
+        console.error("Mekagna reference tone failed:", error);
+        showToast("Could not play the reference tone. Try tapping again.");
+    }
+}
+
 async function startMekagna() {
 
     console.log("🎙️ Starting Mekagna...");
@@ -10800,7 +10978,7 @@ console.log(
         if (button) {
 
             button.textContent =
-                "🎙️ ማዳመጥ";
+                "🎙️ Start listening";
 
         }
 
@@ -10995,17 +11173,31 @@ function detectMekagnaPitch() {
                         detectedFrequency.toFixed(2);
                 }
 
+                const selectedTarget = getMekagnaSelectedTarget();
+                const centsFromTarget = selectedTarget
+                    ? 1200 * Math.log2(detectedFrequency / selectedTarget.frequency)
+                    : Number(noteData.cents);
+
                 if (centsElement) {
+                    const roundedCents = Math.round(centsFromTarget);
+                    centsElement.textContent = Number.isFinite(roundedCents)
+                        ? (roundedCents >= 0 ? `+${roundedCents}` : `${roundedCents}`)
+                        : "--";
+                }
 
-                    const cents =
-                        Math.round(
-                            Number(noteData.cents)
-                        );
-
-                    centsElement.textContent =
-                        cents >= 0
-                            ? `+${cents}`
-                            : `${cents}`;
+                const tuningStatus = document.getElementById("mekagna-tuning-status");
+                if (tuningStatus && Number.isFinite(centsFromTarget)) {
+                    const absoluteCents = Math.abs(centsFromTarget);
+                    if (absoluteCents <= 5) {
+                        tuningStatus.textContent = "✓ IN TUNE";
+                        tuningStatus.className = "mekagna-tuning-status in-tune";
+                    } else if (centsFromTarget < 0) {
+                        tuningStatus.textContent = `LOW · ${Math.round(absoluteCents)}¢`;
+                        tuningStatus.className = "mekagna-tuning-status low";
+                    } else {
+                        tuningStatus.textContent = `HIGH · ${Math.round(absoluteCents)}¢`;
+                        tuningStatus.className = "mekagna-tuning-status high";
+                    }
                 }
             }
         }
@@ -11110,14 +11302,15 @@ function stopMekagna() {
     const button =
         get("listen-button");
 
-
     if (button) {
-
-        button.textContent =
-            "🎙️ ማዳመጥ";
-
+        button.textContent = "🎙️ Start listening";
     }
 
+    const tuningStatus = document.getElementById("mekagna-tuning-status");
+    if (tuningStatus) {
+        tuningStatus.textContent = "Ready to tune";
+        tuningStatus.className = "mekagna-tuning-status ready";
+    }
 
     console.log(
         "🛑 Mekagna stopped."
@@ -13711,7 +13904,39 @@ if (addMezmurForm) {
 }
 
     /* =========================================
-       MEKAGNA
+       MEKAGNA TARGET SELECTION
+    ========================================= */
+    const mekagnaKignetSelect = get("mekagna-kignet-select");
+    if (mekagnaKignetSelect) {
+        mekagnaKignetSelect.addEventListener("change", async () => {
+            state.selectedMekagnaKignet = mekagnaKignetSelect.value;
+            await render();
+        });
+    }
+
+    const mekagnaMajorSelect = get("mekagna-major-select");
+    if (mekagnaMajorSelect) {
+        mekagnaMajorSelect.addEventListener("change", async () => {
+            state.selectedMajor = mekagnaMajorSelect.value;
+            await render();
+        });
+    }
+
+    document.querySelectorAll("[data-mekagna-string]").forEach(button => {
+        button.addEventListener("click", async () => {
+            state.selectedMekagnaString = Number(button.dataset.mekagnaString);
+            await render();
+        });
+    });
+
+    document.querySelectorAll("[data-mekagna-play]").forEach(button => {
+        button.addEventListener("click", async () => {
+            await playMekagnaReferenceTone(Number(button.dataset.mekagnaPlay));
+        });
+    });
+
+    /* =========================================
+       MEKAGNA MICROPHONE CONTROL
     ========================================= */
     document.querySelectorAll("[data-mezmur-id]").forEach(button => {
     button.addEventListener("click", async () => {
@@ -15514,6 +15739,7 @@ async function render() {
     "students",
     "leaderboard",
     "attendance",
+    "tuner",
     "mezmur",
     "assignments",
     "announcements",
