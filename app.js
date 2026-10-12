@@ -353,6 +353,174 @@ function escapeHtml(value) {
 const OFFLINE_STUDENT_KEY =
     "koye_feche_offline_student_v1";
 
+// The app session survives closing/reopening the PWA. Explicit logout
+// clears these keys, so the next launch asks for the password again.
+const APP_SESSION_KEY = "begena_authenticated";
+const APP_SESSION_INFO_KEY = "begena_session_info_v1";
+let logoutInProgress = false;
+
+function readAppSessionInfo() {
+    try {
+        const raw = localStorage.getItem(APP_SESSION_INFO_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        console.warn("Could not read saved app-session information:", error);
+        return null;
+    }
+}
+
+function saveAppSession(user, profile, mode = "online") {
+    try {
+        localStorage.setItem(APP_SESSION_KEY, "true");
+        localStorage.setItem(APP_SESSION_INFO_KEY, JSON.stringify({
+            userId: user?.id || null,
+            role: profile?.role || null,
+            email: user?.email || null,
+            // Cache only the non-secret fields needed to reopen the shell
+            // during a connection outage; never store passwords or tokens here.
+            profile: profile ? {
+                id: profile.id || user?.id || null,
+                full_name: profile.full_name || null,
+                role: profile.role || null,
+                student_id: profile.student_id || null,
+                avatar_url: profile.avatar_url || null,
+                preferred_language: profile.preferred_language || null
+            } : null,
+            mode: mode === "offline" ? "offline" : "online",
+            savedAt: new Date().toISOString()
+        }));
+        sessionStorage.removeItem(APP_SESSION_KEY);
+    } catch (error) {
+        console.warn("Could not persist app session:", error);
+    }
+}
+
+function clearAppSession() {
+    try {
+        localStorage.removeItem(APP_SESSION_KEY);
+        localStorage.removeItem(APP_SESSION_INFO_KEY);
+        sessionStorage.removeItem(APP_SESSION_KEY);
+    } catch (error) {
+        console.warn("Could not clear app session:", error);
+    }
+}
+
+function hasAppSession() {
+    // Migrate a session created by the old build in this still-open tab.
+    if (
+        !localStorage.getItem(APP_SESSION_KEY) &&
+        sessionStorage.getItem(APP_SESSION_KEY) === "true"
+    ) {
+        localStorage.setItem(APP_SESSION_KEY, "true");
+    }
+    return localStorage.getItem(APP_SESSION_KEY) === "true";
+}
+
+async function restoreOfflineStudentSession(sessionInfo = null) {
+    if (!hasAppSession()) return false;
+
+    try {
+        const raw = localStorage.getItem(OFFLINE_STUDENT_KEY);
+        if (!raw) return false;
+
+        const offlineData = JSON.parse(raw);
+        if (
+            !offlineData ||
+            offlineData.version !== 1 ||
+            !offlineData.userId ||
+            !offlineData.profile ||
+            offlineData.profile.role !== "student"
+        ) {
+            return false;
+        }
+
+        // Never restore a different student from a stale local cache.
+        if (sessionInfo?.userId && sessionInfo.userId !== offlineData.userId) {
+            return false;
+        }
+        if (sessionInfo?.role && sessionInfo.role !== "student") {
+            return false;
+        }
+
+        window.currentUser = {
+            id: offlineData.userId,
+            email: offlineData.email || null,
+            offline: true
+        };
+        window.currentProfile = offlineData.profile;
+        state.role = "student";
+        state.page = "home";
+        state.currentClass = offlineData.currentClass || null;
+        state.studentAttendance = Array.isArray(offlineData.studentAttendance)
+            ? offlineData.studentAttendance
+            : [];
+        state.mentorClasses = [];
+
+        // Older builds may have only the session flag, so record the identity
+        // only after it has been matched to the saved student snapshot.
+        if (!sessionInfo?.userId || sessionInfo.mode === "offline") {
+            saveAppSession(window.currentUser, window.currentProfile, "offline");
+        }
+
+        await showApp();
+        await render();
+        console.log("✅ Restored the saved student session from this device");
+        return true;
+    } catch (error) {
+        console.warn("Could not restore saved offline student session:", error);
+        return false;
+    }
+}
+
+async function restoreCachedProfileSession(sessionInfo = null) {
+    if (!hasAppSession() || !sessionInfo?.userId || !sessionInfo?.profile) {
+        return false;
+    }
+
+    const profile = sessionInfo.profile;
+    if (!["student", "mentor", "admin"].includes(profile.role)) {
+        return false;
+    }
+
+    // This path is intentionally only for offline startup. Online sessions
+    // must be verified against Supabase before showing the authenticated app.
+    if (navigator.onLine) return false;
+
+    window.currentUser = {
+        id: sessionInfo.userId,
+        email: sessionInfo.email || null,
+        offline: true
+    };
+    window.currentProfile = profile;
+    state.role = profile.role;
+    state.page = profile.role === "student" ? "home" : "dashboard";
+    state.currentClass = null;
+    state.studentAttendance = [];
+    state.mentorClasses = [];
+    state.mentorAttendanceStudents = [];
+    state.mentorAttendanceStatuses = {};
+
+    if (profile.role === "student") {
+        try {
+            const saved = localStorage.getItem(OFFLINE_STUDENT_KEY);
+            const offlineData = saved ? JSON.parse(saved) : null;
+            if (offlineData?.userId === sessionInfo.userId) {
+                state.currentClass = offlineData.currentClass || null;
+                state.studentAttendance = Array.isArray(offlineData.studentAttendance)
+                    ? offlineData.studentAttendance
+                    : [];
+            }
+        } catch (error) {
+            console.warn("Could not restore cached student details:", error);
+        }
+    }
+
+    await showApp();
+    await render();
+    console.log("✅ Restored the saved app shell while offline");
+    return true;
+}
+
 async function getOnlineSupabaseSession() {
 
     if (!supabaseClient || !navigator.onLine) {
@@ -1361,9 +1529,10 @@ async function loginOfflineStudent(
                 ? offlineData.studentAttendance
                 : [];
 
-        sessionStorage.setItem(
-            "begena_authenticated",
-            "true"
+        saveAppSession(
+            window.currentUser,
+            window.currentProfile,
+            "offline"
         );
 
         await showApp();
@@ -2630,234 +2799,119 @@ async function loadRoleData() {
 ========================================================= */
 
 async function initializeAuth() {
+    const storedSessionExists = hasAppSession();
+    const sessionInfo = readAppSessionInfo();
 
-    if (!supabaseClient) {
-        console.error("❌ Supabase unavailable");
+    if (!storedSessionExists) {
+        window.currentUser = null;
+        window.currentProfile = null;
+        state.currentClass = null;
+        state.studentAttendance = [];
+        state.mentorClasses = [];
         await showLoginPage();
         return;
     }
 
-    /*
-       🔒 LOGIN GATE
+    // A student who signed in while offline can still reopen the cached app.
+    // No password is stored; the active-session marker is removed by Logout.
+    if (sessionInfo?.mode === "offline") {
+        if (await restoreOfflineStudentSession(sessionInfo)) return;
+    }
 
-       The app session flag controls whether the UI is shown.
-       IMPORTANT: do not destroy the Supabase session here.
-       Keeping the refresh token lets a previously authenticated
-       student reconnect automatically after using offline login.
-    */
+    if (!navigator.onLine) {
+        if (await restoreOfflineStudentSession(sessionInfo)) return;
+        if (await restoreCachedProfileSession(sessionInfo)) return;
+        await showLoginPage();
+        return;
+    }
 
-    const appSession =
-        sessionStorage.getItem(
-            "begena_authenticated"
-        );
-
-    if (!appSession) {
-
-        console.log(
-            "🔒 No active app session. Showing login without signing out Supabase."
-        );
-
-        window.currentUser = null;
-        window.currentProfile = null;
-
-        state.currentClass = null;
-        state.studentAttendance = [];
-        state.mentorClasses = [];
-
+    if (!supabaseClient) {
+        if (await restoreOfflineStudentSession(sessionInfo)) return;
         await showLoginPage();
         return;
     }
 
     try {
-
         const {
             data: userData,
-            error
+            error: userError
         } = await supabaseClient.auth.getUser();
 
-        if (error) {
+        const user = userData?.user;
 
-            console.error(
-                "❌ User verification failed:",
-                error
-            );
+        if (userError || !user) {
+            // Network conditions can make getUser fail even though a student
+            // has useful offline content. Only restore the exact cached user.
+            if (await restoreOfflineStudentSession(sessionInfo)) return;
 
-            sessionStorage.removeItem(
-                "begena_authenticated"
-            );
-
+            if (navigator.onLine && !userError) {
+                clearAppSession();
+            }
             await showLoginPage();
             return;
         }
 
-        const user =
-            userData?.user;
-
-        if (!user) {
-
-            console.log(
-                "ℹ️ No authenticated user"
-            );
-
-            sessionStorage.removeItem(
-                "begena_authenticated"
-            );
-
+        if (sessionInfo?.userId && sessionInfo.userId !== user.id) {
+            console.warn("Saved app session does not match the current auth user.");
+            clearAppSession();
             await showLoginPage();
             return;
         }
-
-        /* =========================================
-           AUTH USER
-        ========================================= */
 
         window.currentUser = user;
+        console.log("🔥 LOGGED USER:", user.id, user.email);
 
-sessionStorage.setItem(
-    "begena_authenticated",
-    "true"
-);
-
-        console.log(
-            "🔥 LOGGED USER:",
-            user.id,
-            user.email
-        );
-
-        /* =========================================
-           LOAD REAL PROFILE
-        ========================================= */
-
-        const profile =
-            await loadUserProfile(user.id);
-
+        const profile = await loadUserProfile(user.id);
         if (!profile) {
+            if (await restoreOfflineStudentSession(sessionInfo)) return;
 
-            console.error(
-                "❌ No profile found for:",
-                user.id
-            );
-
-            sessionStorage.removeItem(
-                "begena_authenticated"
-            );
-
-            await supabaseClient.auth.signOut();
+            console.error("❌ No profile found for:", user.id);
+            clearAppSession();
+            try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
             await showLoginPage();
             return;
         }
 
-        console.log(
-            "🔥 PROFILE ROLE:",
-            profile.role
-        );
-
-        /* =========================================
-           APPLY REAL ROLE
-        ========================================= */
-
-        const applied =
-            applyUserProfile(profile);
-
-        if (!applied) {
-
-            console.error(
-                "❌ Failed to apply profile"
-            );
-
-            sessionStorage.removeItem(
-                "begena_authenticated"
-            );
-
-            await supabaseClient.auth.signOut();
+        if (!applyUserProfile(profile)) {
+            console.error("❌ Failed to apply profile");
+            clearAppSession();
+            try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
             await showLoginPage();
             return;
         }
 
-        console.log(
-            "🔥 AUTH STATE:",
-            {
-                userId:
-                    window.currentUser?.id,
+        // Refresh the saved identity and extend the local app session.
+        saveAppSession(user, profile, "online");
 
-                profileId:
-                    window.currentProfile?.id,
-
-                role:
-                    state.role,
-
-                page:
-                    state.page
-            }
-        );
-
-        /* =========================================
-           LOAD ROLE DATA
-        ========================================= */
+        console.log("🔥 AUTH STATE:", {
+            userId: window.currentUser?.id,
+            profileId: window.currentProfile?.id,
+            role: state.role,
+            page: state.page
+        });
 
         await loadRoleData();
-
-        console.log(
-            "🔥 ROLE DATA COMPLETE:",
-            {
-                role:
-                    state.role,
-
-                page:
-                    state.page,
-
-                currentClass:
-                    state.currentClass?.id
-            }
-        );
-
-        /* =========================================
-           SHOW APP
-        ========================================= */
-
         await showApp();
-
-        /* =========================================
-           FINAL RENDER
-        ========================================= */
-
         await render();
 
-        console.log(
-            "🔥 FINAL APP STATE:",
-            {
-                userId:
-                    window.currentUser?.id,
-
-                profileId:
-                    window.currentProfile?.id,
-
-                role:
-                    state.role,
-
-                page:
-                    state.page
-            }
-        );
-
+        console.log("🔥 FINAL APP STATE:", {
+            userId: window.currentUser?.id,
+            profileId: window.currentProfile?.id,
+            role: state.role,
+            page: state.page
+        });
     } catch (error) {
+        console.error("❌ Auth initialization failed:", error);
 
-        console.error(
-            "❌ Auth initialization failed:",
-            error
-        );
+        if (await restoreOfflineStudentSession(sessionInfo)) return;
 
+        // Keep the marker for transient connectivity errors so reopening the
+        // app can retry restoration; Logout always removes it explicitly.
         window.currentUser = null;
         window.currentProfile = null;
-
-        sessionStorage.removeItem(
-            "begena_authenticated"
-        );
-
         await showLoginPage();
     }
 }
-
 
 /* =========================================================
    STUDENT ID LOGIN
@@ -3119,7 +3173,7 @@ console.log("🟠 LOGIN LOOKUP RESULT:", lookupData);
 
                     }
 
-                    await supabaseClient.auth.signOut();
+                    await supabaseClient.auth.signOut({ scope: "local" });
 
                     return;
 
@@ -3139,12 +3193,13 @@ console.log("🟠 LOGIN LOOKUP RESULT:", lookupData);
 
                     }
 
-                    await supabaseClient.auth.signOut();
+                    await supabaseClient.auth.signOut({ scope: "local" });
 
                     return;
 
                 }
 
+                saveAppSession(user, profile, "online");
 
                 await loadRoleData();
 
@@ -3242,25 +3297,21 @@ function setupAuthListener() {
             );
 
 
-            if (!session) {
+            // INITIAL_SESSION can legitimately be null for a student who
+            // signed in offline. Only a real sign-out event should end the app
+            // session automatically.
+            if (!session && event === "SIGNED_OUT") {
+                if (!logoutInProgress) {
+                    clearAppSession();
+                }
 
-                window.currentUser =
-                    null;
-
-                window.currentProfile =
-                    null;
-
-                state.currentClass =
-                    null;
-
-                state.studentAttendance =
-                    [];
-
-                state.mentorClasses =
-                    [];
+                window.currentUser = null;
+                window.currentProfile = null;
+                state.currentClass = null;
+                state.studentAttendance = [];
+                state.mentorClasses = [];
 
                 await showLoginPage();
-
             }
 
         }
@@ -15351,137 +15402,102 @@ function updateRoleButtons() {
 function setupGeneralEvents() {
 
 // ================================
-// LOGOUT
+// LOGOUT — shared by desktop and mobile controls
 // ================================
 
-const logoutButton = document.getElementById("logout-button");
+async function performLogout() {
+    if (logoutInProgress) return;
+    logoutInProgress = true;
 
-if (logoutButton) {
-    logoutButton.addEventListener("click", async () => {
+    const desktopButton = document.getElementById("logout-button");
+    const mobileButton = document.getElementById("mobile-logout-button");
+    const buttons = [desktopButton, mobileButton].filter(Boolean);
 
-        if (logoutButton.disabled) {
-            return;
-        }
-
-        logoutButton.disabled = true;
-        logoutButton.textContent = "Logging out...";
-
-        try {
-
-            const { error } =
-                await supabaseClient.auth.signOut();
-                localStorage.removeItem(
-    OFFLINE_STUDENT_KEY
-);
-
-            if (error) {
-                throw error;
-            }
-
-            window.currentUser = null;
-            window.currentProfile = null;
-
-            state.currentClass = null;
-            state.studentAttendance = [];
-            state.mentorClasses = [];
-
-            await showLoginPage();
-
-            logoutButton.disabled = false;
-            logoutButton.textContent = "🚪 Logout";
-
-        } catch (error) {
-
-            console.error("❌ Logout failed:", error);
-
-            logoutButton.disabled = false;
-            logoutButton.textContent = "🚪 Logout";
-
-            showToast("Logout failed. Please try again.");
-        }
+    buttons.forEach(button => {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        button.innerHTML = '<span>Logging out…</span>';
     });
-}
-const mobileLogoutButton =
-    document.getElementById("mobile-logout-button");
 
+    let signOutError = null;
+    try {
+        // Remove the persistent app gate first so it never survives an
+        // explicit logout, even if the network is unavailable.
+        clearAppSession();
 
-if (mobileLogoutButton) {
-
-    mobileLogoutButton.addEventListener(
-        "click",
-        async () => {
-
-            closeDrawer();
-
-
-            if (mobileLogoutButton.disabled) {
-                return;
-            }
-
-
-            mobileLogoutButton.disabled =
-                true;
-
-            mobileLogoutButton.innerHTML =
-                `<span>Logging out...</span>`;
-
-
+        if (supabaseClient) {
             try {
-
-                const { error } =
-                    await supabaseClient.auth.signOut();
-                    localStorage.removeItem(
-    OFFLINE_STUDENT_KEY
-);
-
-
-                if (error) {
-                    throw error;
-                }
-
-
-                window.currentUser = null;
-                window.currentProfile = null;
-
-
-                state.currentClass = null;
-                state.studentAttendance = [];
-                state.mentorClasses = [];
-                state.mentorAttendanceStudents = [];
-                state.mentorAttendanceStatuses = {};
-
-
-                await showLoginPage();
-
-
+                const { error } = await supabaseClient.auth.signOut({ scope: "local" });
+                if (error) signOutError = error;
             } catch (error) {
-
-                console.error(
-                    "❌ Mobile logout failed:",
-                    error
-                );
-
-
-                mobileLogoutButton.disabled =
-                    false;
-
-                mobileLogoutButton.innerHTML =
-                    `
-                    <span class="logout-icon">↪</span>
-                    <span>Logout</span>
-                    `;
-
-
-                showToast(
-                    "Logout failed. Please try again."
-                );
-
+                signOutError = error;
             }
-
         }
-    );
 
+        window.currentUser = null;
+        window.currentProfile = null;
+        state.currentClass = null;
+        state.studentAttendance = [];
+        state.mentorClasses = [];
+        state.mentorAttendanceStudents = [];
+        state.mentorStudentProgress = {};
+        state.mentorAttendanceStatuses = {};
+        state.selectedMezmurId = null;
+        state.page = "home";
+
+        // Keep the hashed offline-login verifier and cached lessons so the
+        // same student can sign in again offline by entering their password.
+        closeDrawer();
+        const studentIdInput = get("login-student-id");
+        const passwordInput = get("login-password");
+        const loginError = get("login-error");
+        if (studentIdInput) studentIdInput.value = "";
+        if (passwordInput) passwordInput.value = "";
+        if (loginError) loginError.textContent = "";
+
+        await showLoginPage();
+
+        if (signOutError) {
+            console.warn("Local logout completed, but Supabase returned a sign-out warning:", signOutError);
+            showToast("Signed out on this device. Reconnect before using online features.");
+        } else {
+            showToast("✅ You’ve been logged out.");
+        }
+    } catch (error) {
+        console.error("Logout cleanup encountered an error:", error);
+        // Still make sure the persistent local session is ended.
+        clearAppSession();
+        window.currentUser = null;
+        window.currentProfile = null;
+        state.currentClass = null;
+        state.studentAttendance = [];
+        state.mentorClasses = [];
+        try { await showLoginPage(); } catch (_) {}
+        showToast("Signed out on this device. Please sign in again.");
+    } finally {
+        buttons.forEach(button => {
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+            if (button.id === "mobile-logout-button") {
+                button.innerHTML = '<span class="logout-icon">↪</span><span>Logout</span>';
+            } else {
+                button.innerHTML = '<span class="logout-icon">↪</span><span>Logout</span>';
+            }
+        });
+        logoutInProgress = false;
+    }
 }
+
+const logoutButton = document.getElementById("logout-button");
+if (logoutButton) {
+    logoutButton.addEventListener("click", performLogout);
+}
+
+const mobileLogoutButton = document.getElementById("mobile-logout-button");
+if (mobileLogoutButton) {
+    mobileLogoutButton.addEventListener("click", performLogout);
+}
+
     const menuButton =
         get("menu-button");
 
@@ -15848,6 +15864,7 @@ document.addEventListener(
 
         if (
             window.currentProfile?.role === "student" &&
+            !window.currentUser?.offline &&
             navigator.onLine
         ) {
             scheduleStudentOfflineSync("startup");

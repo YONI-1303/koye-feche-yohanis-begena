@@ -3679,3 +3679,67 @@ textarea {
     }
 }
 
+
+
+/* =========================================================
+   QUIET CREATOR CREDIT + SESSION NOTE
+   ========================================================= */
+.creator-credit {
+    margin: 0;
+    color: rgba(159, 180, 170, 0.48);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.6;
+    letter-spacing: 0.045em;
+    text-align: center;
+    user-select: none;
+}
+
+.creator-credit strong {
+    color: rgba(241, 207, 120, 0.68);
+    font-weight: 650;
+}
+
+.session-note {
+    margin: 3px 0 0;
+    color: rgba(159, 180, 170, 0.66);
+    font-size: 11px;
+    line-height: 1.6;
+    text-align: center;
+}
+
+#login-page .creator-credit--login {
+    margin-top: 9px;
+}
+
+.desktop-sidebar .creator-credit--sidebar {
+    margin: 10px 0 0;
+}
+
+.app-footer {
+    padding: 0 12px 12px;
+    color: rgba(159, 180, 170, 0.38);
+    font-size: 10px;
+    letter-spacing: 0.045em;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.app-footer strong {
+    color: rgba(241, 207, 120, 0.58);
+    font-weight: 600;
+}
+
+.mobile-drawer .creator-credit--drawer {
+    margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+    .app-footer {
+        padding-bottom: max(14px, env(safe-area-inset-bottom));
+    }
+
+    #login-page .login-card {
+        padding-bottom: 30px;
+    }
+}
