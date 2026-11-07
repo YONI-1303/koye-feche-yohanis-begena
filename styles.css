@@ -3743,3 +3743,368 @@ textarea {
         padding-bottom: 30px;
     }
 }
+
+/* =========================================================
+   KFY FEATURE UPDATE — LEFT-HAND BEGENA + MENTOR TOOLS
+   ========================================================= */
+.begena-practice-shell {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+
+.begena-practice-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.begena-practice-hero h2 {
+    margin: 8px 0 5px;
+}
+
+.begena-practice-hero p {
+    margin: 0;
+}
+
+.begena-practice-grid {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1.45fr) minmax(270px, .75fr);
+}
+
+.begena-instrument-card {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.begena-practice-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.begena-practice-controls label,
+.kfy-form-stack label {
+    display: grid;
+    gap: 7px;
+    font-weight: 750;
+}
+
+.begena-practice-controls label span {
+    color: var(--muted, #a6b8ae);
+    font-size: 12px;
+}
+
+.begena-left-hand-hint {
+    margin: 5px 0 10px;
+    text-align: center;
+    color: var(--gold, #d5ad51);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .12em;
+}
+
+.begena-landscape-instrument {
+    width: 100%;
+    min-height: 280px;
+    overflow: visible;
+}
+
+.begena-landscape-instrument .begena-body {
+    width: min(94%, 850px);
+    max-width: 850px;
+    height: clamp(190px, 27vw, 285px);
+}
+
+.begena-landscape-instrument .begena-strings {
+    inset: 15px 9%;
+    align-items: stretch;
+}
+
+.begena-landscape-instrument .begena-string {
+    position: relative;
+    flex: 0 0 4px;
+    min-width: 4px;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    background: linear-gradient(90deg, #f5e7bb, #ad7837, #fff0c9);
+    box-shadow: 0 0 2px rgba(255, 235, 183, .45);
+    border-radius: 100px;
+    color: #fff5da;
+    appearance: none;
+}
+
+.begena-landscape-instrument .begena-string-number {
+    position: absolute;
+    top: -27px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+    opacity: .86;
+}
+
+.begena-landscape-instrument .begena-string-note {
+    position: absolute;
+    bottom: -29px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #f5d989;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.begena-landscape-instrument .begena-string-muted {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 15px;
+    opacity: .6;
+}
+
+.begena-landscape-instrument .begena-string.playable-string {
+    cursor: pointer;
+    pointer-events: auto;
+    opacity: 1;
+}
+
+.begena-landscape-instrument .begena-string.secondary-string {
+    cursor: default;
+    pointer-events: none;
+    opacity: .27;
+}
+
+.begena-landscape-instrument .begena-string.is-selected {
+    background: linear-gradient(90deg, #fff9dd, #f4c75c, #fff9dd);
+    box-shadow: 0 0 12px rgba(241, 207, 120, .7);
+}
+
+.begena-note-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin: 15px 0;
+}
+
+.begena-note-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,.025);
+    border-radius: 13px;
+    padding: 11px 12px;
+}
+
+.begena-note-chip span {
+    color: var(--muted, #a6b8ae);
+    font-size: 12px;
+}
+
+.begena-note-chip b {
+    color: var(--gold, #d5ad51);
+    font-size: 18px;
+}
+
+.begena-selected-string-card {
+    display: grid;
+    gap: 5px;
+}
+
+.begena-selected-string-card strong {
+    font-size: 17px;
+}
+
+.begena-practice-footnote,
+.begena-instrument-caption {
+    margin-top: 12px;
+    color: var(--muted, #a6b8ae);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.begena-practice-shell:fullscreen {
+    width: 100vw;
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 14px 18px;
+    overflow: auto;
+    background: var(--bg, #07130e);
+}
+
+.begena-practice-shell:fullscreen .begena-practice-grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, .7fr);
+}
+
+.begena-practice-shell:fullscreen .begena-landscape-instrument {
+    min-height: min(58vh, 520px);
+}
+
+.begena-practice-shell:fullscreen .begena-landscape-instrument .begena-body {
+    width: min(94%, 1050px);
+    height: min(48vh, 390px);
+}
+
+.kfy-mezmur-video {
+    margin-top: 20px;
+    padding-top: 17px;
+    border-top: 1px solid var(--border);
+}
+
+.kfy-mezmur-video h3 {
+    margin: 0;
+}
+
+.kfy-video-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    margin-top: 12px;
+    overflow: hidden;
+    border-radius: 16px;
+    background: #050806;
+    border: 1px solid var(--border);
+}
+
+.kfy-video-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+}
+
+.kfy-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, .76);
+    backdrop-filter: blur(8px);
+}
+
+.kfy-modal-card {
+    width: min(660px, 100%);
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, .48);
+}
+
+.kfy-form-stack {
+    display: grid;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.btn.danger {
+    color: #ffdede;
+    border: 1px solid rgba(235, 96, 96, .28);
+    background: rgba(156, 42, 42, .22);
+}
+
+.kfy-student-warning-banner {
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+    width: 100%;
+    margin: 14px 0 0;
+    text-align: left;
+    border: 1px solid rgba(213, 173, 81, .42);
+    cursor: pointer;
+}
+
+.kfy-student-warning-banner strong {
+    font-size: 15px;
+}
+
+.kfy-student-warning-banner > span:last-child {
+    color: var(--gold, #d5ad51);
+    font-size: 12px;
+}
+
+@media (max-width: 700px) {
+    .begena-practice-hero {
+        align-items: flex-start;
+    }
+
+    .begena-practice-grid,
+    .begena-practice-shell:fullscreen .begena-practice-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .begena-landscape-instrument {
+        min-height: 255px;
+    }
+
+    .begena-landscape-instrument .begena-body {
+        width: 94%;
+        height: 195px;
+    }
+
+    .begena-practice-shell:fullscreen {
+        padding: 9px;
+    }
+
+    .begena-practice-shell:fullscreen .begena-practice-grid {
+        display: block;
+    }
+
+    .begena-practice-shell:fullscreen .begena-practice-details {
+        margin-top: 12px;
+    }
+
+    .begena-practice-shell:fullscreen .begena-landscape-instrument {
+        min-height: 52vh;
+    }
+
+    .begena-practice-shell:fullscreen .begena-landscape-instrument .begena-body {
+        width: 94vw;
+        height: 38vh;
+    }
+}
+
+@media (max-width: 700px) and (orientation: landscape) {
+    .begena-practice-shell:fullscreen .begena-practice-hero {
+        margin-bottom: 8px;
+        padding: 10px 14px;
+    }
+
+    .begena-practice-shell:fullscreen .begena-practice-hero p {
+        display: none;
+    }
+
+    .begena-practice-shell:fullscreen .begena-practice-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(190px, .7fr);
+        gap: 10px;
+    }
+
+    .begena-practice-shell:fullscreen .begena-instrument-card,
+    .begena-practice-shell:fullscreen .begena-practice-details {
+        padding: 11px;
+    }
+
+    .begena-practice-shell:fullscreen .begena-practice-controls {
+        margin-bottom: 8px;
+    }
+
+    .begena-practice-shell:fullscreen .begena-landscape-instrument {
+        min-height: 56vh;
+    }
+
+    .begena-practice-shell:fullscreen .begena-landscape-instrument .begena-body {
+        height: 38vh;
+        width: 94%;
+    }
+}

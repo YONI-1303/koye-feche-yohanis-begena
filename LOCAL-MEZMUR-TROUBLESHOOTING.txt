@@ -1,0 +1,13 @@
+Koye Feche Begena - Local Mezmur diagnostic update
+
+1. Extract this ZIP and open the extracted folder in VS Code.
+2. Start the local server with: npm start
+3. Open http://localhost:3000
+4. Sign in to the mentor account and click Mezmur in the mentor navigation.
+5. The Mezmur history list should load from the connected Supabase project.
+6. Use Refresh list if needed. If Supabase cannot load the list, the page now displays the actual error message.
+7. When adding a Mezmur, wait for the save verification message. Do not repeatedly submit the same song if it appears to be slow; use Refresh list first.
+
+The HTML doctype and app/service-worker cache version were updated so the browser picks up the new source files.
+
+No additional SQL needs to be run. Existing Supabase changes are already in place.

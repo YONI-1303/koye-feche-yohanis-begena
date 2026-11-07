@@ -1,10 +1,10 @@
-const CACHE_NAME = "kfy-begena-v12";
+const CACHE_NAME = "kfy-begena-v15";
 
 const APP_SHELL = [
     "./",
     "./index.html",
-    "./styles.css?v=203",
-    "./app.js?v=215",
+    "./styles.css?v=205",
+    "./app.js?v=218",
     "./manifest.webmanifest",
     "./images/begena/begena-hero.jpg",
     "./images/begena/begena-mezmur.jpg",
@@ -155,108 +155,49 @@ self.addEventListener("fetch", event => {
      * =========================================
      */
 
-    if (
-        url.pathname.includes("/audio/begena/")
-    )
-    /*
- * =========================================
- * SUPABASE ANNOUNCEMENT AUDIO
- * =========================================
- */
-
-if (
-    url.pathname.includes(
-        "/storage/v1/object/sign/announcement-audio/"
-    )
-) {
-
-    event.respondWith(
-
-        caches.match(request).then(
-            cachedResponse => {
-
-                if (cachedResponse) {
-                    return cachedResponse;
-                }
-
-                return fetch(request)
-                    .then(response => {
-
-                        if (
-                            response &&
-                            (
-                                response.ok ||
-                                response.type === "opaque"
-                            )
-                        ) {
-
-                            const clone =
-                                response.clone();
-
-                            caches.open(
-                                CACHE_NAME
-                            ).then(cache => {
-
-                                cache.put(
-                                    request,
-                                    clone
-                                );
-
-                            });
-
-                        }
-
-                        return response;
-
-                    });
-
-            }
-        )
-
-    );
-
-    return;
-}
-    {
-
+    if (url.pathname.includes("/audio/begena/")) {
         event.respondWith(
-
             caches.match(request).then(cachedResponse => {
-
-                if (cachedResponse) {
-                    return cachedResponse;
-                }
+                if (cachedResponse) return cachedResponse;
 
                 return fetch(request).then(response => {
-
                     if (response && response.ok) {
-
-                        const responseClone =
-                            response.clone();
-
-                        caches.open(CACHE_NAME)
-                            .then(cache => {
-
-                                cache.put(
-                                    request,
-                                    responseClone
-                                );
-
-                            });
-
+                        const responseClone = response.clone();
+                        caches.open(CACHE_NAME).then(cache => {
+                            cache.put(request, responseClone);
+                        });
                     }
-
                     return response;
-
                 });
-
             })
-
         );
-
         return;
     }
 
+    /*
+     * =========================================
+     * SUPABASE ANNOUNCEMENT AUDIO
+     * =========================================
+     */
+
+    if (url.pathname.includes("/storage/v1/object/sign/announcement-audio/")) {
+        event.respondWith(
+            caches.match(request).then(cachedResponse => {
+                if (cachedResponse) return cachedResponse;
+
+                return fetch(request).then(response => {
+                    if (response && response.ok) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then(cache => {
+                            cache.put(request, clone);
+                        });
+                    }
+                    return response;
+                });
+            })
+        );
+        return;
+    }
 
     /*
      * =========================================

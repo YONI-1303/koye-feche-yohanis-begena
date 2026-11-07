@@ -43,3 +43,12 @@ The tuning configuration is local JavaScript, so no Supabase table/schema migrat
 - Startup can restore the matching student's cached offline session, or a minimal cached profile shell during offline startup. No password or Supabase token is stored in the new app-session metadata.
 - Added a subtle “Made by Yonathan Mitiku” credit on the login screen, navigation areas, and app footer.
 - Bumped the script to `v215`, stylesheet to `v203`, and service-worker cache to `kfy-begena-v12` for the installed PWA update.
+
+## Local Mezmur list visibility / debugging update (2026-11-07)
+
+- Added the HTML5 `<!DOCTYPE html>` declaration so browsers render in Standards Mode rather than Quirks Mode.
+- Bumped the app shell cache to `kfy-begena-v15` and the asset URLs to `app.js?v=218` / `styles.css?v=205` so installed/local copies refresh the modified files.
+- The mentor Mezmur list now displays the actual Supabase load error in the page instead of silently looking empty.
+- Added a manual **Refresh list** action to the mentor Mezmur history.
+- Mezmur create/update now asks Supabase to return the saved record, verifies that a row was returned, and shows an error rather than a success toast if saving fails or cannot be verified.
+- No additional database migration is required for this update.

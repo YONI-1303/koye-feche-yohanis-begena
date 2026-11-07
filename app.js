@@ -135,6 +135,14 @@ const state = {
 
     selectedMajor: "C",
 
+    selectedPracticeKignet: "Selamta",
+
+    selectedPracticeMajor: "D",
+
+    studentWarnings: [],
+
+    mentorStudentWarnings: [],
+
     selectedMekagnaString: 1,
 
     listening: false,
@@ -694,6 +702,7 @@ async function cacheStudentOfflineContent() {
                     qenet,
                     level,
                     audio_path,
+                    youtube_url,
                     published,
                     created_at
                 `)
@@ -3367,6 +3376,13 @@ const studentNavigation = [
     en: "Leaderboard"
     },
     {
+        id: "warnings",
+        icon: "⚠️",
+        am: "የአስተማሪ ማስጠንቀቂያ",
+        en: "Mentor Notices"
+    },
+
+    {
         id: "attendance",
         icon: "✅",
         am: "ክትትል",
@@ -3908,6 +3924,13 @@ function studentHome() {
 
         </div>
 
+        ${(state.studentWarnings || []).some(w => w.status === "active") ? `
+            <button type="button" class="card kfy-student-warning-banner" data-go="warnings">
+                <span class="pill gold">⚠️ MENTOR NOTICE</span>
+                <strong>${(state.studentWarnings || []).filter(w => w.status === "active").length} active notice(s) from your mentor</strong>
+                <span>Open notices →</span>
+            </button>
+        ` : ""}
 
         <div
             class="grid two"
@@ -5588,179 +5611,100 @@ async function saveAttendance() {
 ========================================================= */
 
 function begenaPage() {
+    const targets = getBegenaPracticeTargets();
+    const targetByString = new Map(
+        targets.map(target => [target.stringNumber, target])
+    );
+    const kignet = state.selectedPracticeKignet || "Selamta";
+    const major = state.selectedPracticeMajor || "D";
+    const kignetOptions = Object.entries(MEKAGNA_KIGNET_INTERVALS)
+        .map(([value, info]) => `
+            <option value="${escapeHtml(value)}" ${value === kignet ? "selected" : ""}>
+                ${escapeHtml(info.labelAm)} — ${escapeHtml(value)}
+            </option>
+        `).join("");
+    const majorOptions = MEKAGNA_MAJORS.map(item => `
+        <option value="${escapeHtml(item.note)}" ${item.note === major ? "selected" : ""}>
+            ${escapeHtml(item.label)}
+        </option>
+    `).join("");
 
-const mainBegenaStrings = [
-    1,
-    4,
-    6,
-    8,
-    10
-];
+    // The physical instrument is shown from the player's left hand: 10 → 1.
+    const visualOrder = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+    const playableStrings = new Set(MEKAGNA_STRING_NUMBERS);
+    const strings = visualOrder.map(number => {
+        const target = targetByString.get(number);
+        const playable = playableStrings.has(number);
+        return `
+            <button
+                type="button"
+                class="begena-string ${playable ? "playable-string" : "secondary-string"} ${state.selectedString === number ? "is-selected" : ""}"
+                data-string="${number}"
+                ${playable ? `data-note="${escapeHtml(target?.note || "")}"` : "disabled"}
+                title="${playable ? `String ${number} • ${target?.note || ""}` : `String ${number}` }"
+                aria-label="${playable ? `Play string ${number}, ${target?.note || "note not set"}` : `String ${number}, not in this kignet` }"
+            >
+                <span class="begena-string-number">${number}</span>
+                ${playable ? `<strong class="begena-string-note">${escapeHtml(target?.note || "—")}</strong>` : `<span class="begena-string-muted">·</span>`}
+            </button>
+        `;
+    }).join("");
 
-
-const strings =
-    Array
-        .from(
-            {
-                length: 10
-            },
-            (_, index) => {
-
-                const number =
-                    index + 1;
-
-                const playable =
-                    mainBegenaStrings.includes(
-                        number
-                    );
-
-
-                return `
-
-                    <div
-                        class="
-                            begena-string
-                            ${
-                                playable
-                                    ? "playable-string"
-                                    : "secondary-string"
-                            }
-                        "
-                        data-string="${number}"
-                        title="String ${number}"
-                    >
-
-                        <span>
-                            ${number}
-                        </span>
-
-                    </div>
-
-                `;
-
-            }
-        )
-        .join("");
-
+    const targetSummary = targets.map(target => `
+        <div class="begena-note-chip">
+            <span>String ${target.stringNumber}</span>
+            <b>${escapeHtml(target.note)}</b>
+        </div>
+    `).join("");
 
     return `
-
-        <div class="grid two">
-
-            <div class="card">
-
-                <div class="row space">
-
-                    <div>
-
-                        <h3>
-                            🎻 በገና ማሰልጠኛ
-                        </h3>
-
-                        <div class="muted">
-                            10 ገመዶች
-                        </div>
-
-                    </div>
-
-
-                    <div class="row">
-
-    <select id="preset-select">
-
-        <option>Selamta</option>
-        <option>Tizita</option>
-        <option>Sile Chernet</option>
-
-    </select>
-
-    <button
-        type="button"
-        class="btn secondary"
-        id="begena-practice-button"
-    >
-        🎻 Practice Mode
-    </button>
-
-</div>
-
+        <div class="begena-practice-shell">
+            <div class="hero begena-practice-hero">
+                <div>
+                    <span class="pill gold">LEFT-HAND PRACTICE</span>
+                    <h2>🎻 በገና ማሰልጠኛ</h2>
+                    <p>Choose your kignet and major. The five playable strings update to their notes automatically.</p>
                 </div>
-
-
-                <div class="instrument">
-
-                    <div class="begena-body">
-
-                        <div class="begena-strings">
-                            ${strings}
-                        </div>
-
-                    </div>
-
-                </div>
-
+                <button type="button" class="btn secondary" id="begena-practice-button">⛶ Landscape Practice</button>
             </div>
 
+            <div class="grid two begena-practice-grid">
+                <section class="card begena-instrument-card">
+                    <div class="begena-practice-controls">
+                        <label>
+                            <span>Kignet / ቅኝት</span>
+                            <select id="preset-select">${kignetOptions}</select>
+                        </label>
+                        <label>
+                            <span>Major / ሜጀር</span>
+                            <select id="begena-major-select">${majorOptions}</select>
+                        </label>
+                    </div>
 
-            <div class="card">
-
-                <h3>
-                    🎼 የበገና ሁኔታ
-                </h3>
-
-
-                <div class="list">
-
-                    <div class="list-item">
-
-                        <b>
-                            Preset
-                        </b>
-
-                        <div
-                            class="muted"
-                            id="preset-name"
-                        >
-                            Selamta
+                    <div class="begena-left-hand-hint">LEFT HAND · STRINGS RUN 10 → 1</div>
+                    <div class="instrument begena-landscape-instrument">
+                        <div class="begena-body">
+                            <div class="begena-strings">${strings}</div>
                         </div>
-
                     </div>
+                    <div class="muted begena-instrument-caption">Tap a highlighted string to hear its current note.</div>
+                </section>
 
-
-                    <div class="list-item">
-
-                        <b>
-                            ገመድ
-                        </b>
-
-                        <div
-                            class="muted"
-                            id="string-name"
-                        >
-                            አልተመረጠም
-                        </div>
-
+                <section class="card begena-practice-details">
+                    <span class="pill gold">CURRENT TUNING</span>
+                    <h3>${escapeHtml(kignet)} · ${escapeHtml(major)} Major</h3>
+                    <p class="muted">These are the five main strings for the selected kignet and major.</p>
+                    <div class="begena-note-summary">${targetSummary}</div>
+                    <div class="list-item begena-selected-string-card" aria-live="polite">
+                        <div class="muted">Selected string</div>
+                        <strong id="string-name">${state.selectedString && targetByString.has(Number(state.selectedString)) ? `String ${Number(state.selectedString)} · ${escapeHtml(targetByString.get(Number(state.selectedString)).note)}` : "Tap a playable string"}</strong>
                     </div>
-
-
-                    <div class="list-item">
-
-                        <span class="pill">
-                            🎵 Practice Mode
-                        </span>
-
-                    </div>
-
-                </div>
-
+                    <div class="begena-practice-footnote">For practice and learning. Use your mentor’s verified tuning for live performance.</div>
+                </section>
             </div>
-
         </div>
-
     `;
-
 }
-
 
 /* =========================================================
    MEKAGNA
@@ -5832,6 +5776,50 @@ function getMekagnaTargets() {
             note: mekagnaMidiToNote(midi),
             frequency
         };
+    });
+}
+
+function getBegenaPracticeTargets() {
+    const kignet = MEKAGNA_KIGNET_INTERVALS[state.selectedPracticeKignet]
+        ? state.selectedPracticeKignet
+        : "Selamta";
+    const major = MEKAGNA_MAJORS.find(item => item.note === state.selectedPracticeMajor)
+        || MEKAGNA_MAJORS.find(item => item.note === "D")
+        || MEKAGNA_MAJORS[0];
+    const rootMidi = 36 + major.semitones;
+    const intervals = MEKAGNA_KIGNET_INTERVALS[kignet].intervals;
+
+    return MEKAGNA_STRING_NUMBERS.map((stringNumber, index) => {
+        const midi = rootMidi + intervals[index];
+        return {
+            stringNumber,
+            midi,
+            note: mekagnaMidiToNote(midi),
+            frequency: mekagnaMidiToFrequency(midi)
+        };
+    });
+}
+
+function playBegenaPracticeString(stringNumber) {
+    const target = getBegenaPracticeTargets().find(
+        item => item.stringNumber === Number(stringNumber)
+    );
+    if (!target) return;
+
+    const match = target.note.match(/^([A-G]#?)(-?\d+)$/);
+    if (!match) return;
+    const noteSlug = {
+        C: "c", "C#": "cs", D: "d", "D#": "ds", E: "e",
+        F: "f", "F#": "fs", G: "g", "G#": "gs", A: "a",
+        "A#": "as", B: "b"
+    }[match[1]];
+    if (!noteSlug) return;
+
+    const audio = new Audio(`./audio/begena/begena_audio/b${noteSlug}${match[2]}.ogg`);
+    audio.preload = "auto";
+    audio.play().catch(error => {
+        console.warn("Begena note playback failed:", error);
+        showToast("Audio could not play. Check that the note file is available.");
     });
 }
 
@@ -6038,6 +6026,25 @@ const mezmurLibrary = [
 ];
 
 const activeMezmur = mezmurLibrary[0];
+function getYouTubeEmbedUrl(value) {
+    if (!value) return "";
+    try {
+        const url = new URL(String(value).trim());
+        const host = url.hostname.toLowerCase().replace(/^www\./, "");
+        let videoId = "";
+        if (host === "youtu.be") {
+            videoId = url.pathname.split("/").filter(Boolean)[0] || "";
+        } else if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+            if (url.pathname === "/watch") videoId = url.searchParams.get("v") || "";
+            else if (/^\/(embed|shorts)\//.test(url.pathname)) videoId = url.pathname.split("/")[2] || "";
+        }
+        if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return "";
+        return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+    } catch (_) {
+        return "";
+    }
+}
+
 async function mezmurPage() {
 
     /*
@@ -6124,6 +6131,7 @@ async function mezmurPage() {
                     qenet,
                     level,
                     audio_path,
+                    youtube_url,
                     published,
                     created_at
                 `)
@@ -6519,6 +6527,25 @@ async function mezmurPage() {
 
                     </p>
 
+
+                    ${getYouTubeEmbedUrl(selectedMezmur.youtube_url) ? `
+                        <div class="kfy-mezmur-video">
+                            <div class="row space">
+                                <h3>▶️ Watch the Mezmur</h3>
+                                <span class="pill gold">In-app player</span>
+                            </div>
+                            <div class="kfy-video-frame">
+                                <iframe
+                                    src="${getYouTubeEmbedUrl(selectedMezmur.youtube_url)}"
+                                    title="${escapeHtml(selectedMezmur.title_en || selectedMezmur.title_am || "Mezmur video") }"
+                                    loading="lazy"
+                                    referrerpolicy="strict-origin-when-cross-origin"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowfullscreen
+                                ></iframe>
+                            </div>
+                        </div>
+                    ` : ""}
 
                     <div
                         class="row"
@@ -8346,6 +8373,9 @@ function mentorStudentsPage() {
 
                                                 </div>
 
+                                                <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;">
+                                                    <button type="button" class="btn secondary" onclick="kfyOpenStudentWarnings('${student.student_id}','${classroom.id}')">⚠️ Notices (${(state.mentorStudentWarnings || []).filter(w => w.student_id === student.student_id && w.status === "active").length})</button>
+                                                </div>
                                             </div>
 
                                         </div>
@@ -8532,6 +8562,8 @@ function mentorStudentsPage() {
 
         </div>
 
+        ${studentWarningsModalMarkup()}
+
     `;
 
 }
@@ -8592,6 +8624,8 @@ async function mentorAssignmentsPage() {
         );
     }
 
+    window.kfyMentorAssignments = assignments || [];
+
     const assignmentList =
         assignments?.length
             ? assignments.map(assignment => {
@@ -8615,9 +8649,12 @@ async function mentorAssignmentsPage() {
                         </div>
 
                         <div class="muted">
-                            📅 ${createdAt}
+                            📅 ${createdAt} · ${escapeHtml(assignment.status || "draft")}
                         </div>
-
+                        <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px;">
+                            <button type="button" class="btn" onclick="kfyEditMentorAssignment('${assignment.id}')">✏️ Edit</button>
+                            <button type="button" class="btn danger" onclick="kfyDeleteMentorAssignment('${assignment.id}')">🗑 Delete</button>
+                        </div>
                     </div>
                 `;
 
@@ -8652,7 +8689,7 @@ async function mentorAssignmentsPage() {
                         gap:10px;
                     "
                 >
-
+                    <input type="hidden" id="assignment-id" value="">
                     <input
                         id="assignment-title"
                         placeholder="የስራው ርዕስ"
@@ -8670,6 +8707,7 @@ async function mentorAssignmentsPage() {
                     >
                         📤 ላክ
                     </button>
+                    <button type="button" class="btn" onclick="kfyResetMentorAssignmentForm()">Cancel edit</button>
 
                 </div>
 
@@ -8700,152 +8738,68 @@ async function mentorAssignmentsPage() {
    ANNOUNCEMENTS
 ========================================================= */
 
-function announcementsPage() {
+async function announcementsPage() {
+    const mentorClass = state.mentorClasses?.[0] || state.currentClass;
+    let announcements = [];
+    if (mentorClass?.id && supabaseClient) {
+        const { data, error } = await supabaseClient
+            .from("announcements")
+            .select("id,title,body,audio_path,published,created_at,target_class_id")
+            .eq("target_class_id", mentorClass.id)
+            .order("created_at", { ascending: false });
+        if (error) console.error("Announcement history failed:", error);
+        else announcements = data || [];
+    }
+    window.kfyMentorAnnouncements = announcements;
+    const history = announcements.length ? announcements.map(item => `
+        <article class="list-item">
+            <div class="row space" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                <div style="min-width:0;flex:1;">
+                    <strong>${escapeHtml(item.title || "Untitled announcement")}</strong>
+                    <div class="muted" style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(item.body || "")}</div>
+                    <div class="muted" style="margin-top:7px;">${item.created_at ? new Date(item.created_at).toLocaleString() : ""}${item.audio_path ? " · 🎙️ Voice attached" : ""}</div>
+                </div>
+                <span class="pill ${item.published ? "gold" : ""}">${item.published ? "Published" : "Draft"}</span>
+            </div>
+            <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px;">
+                <button type="button" class="btn" onclick="kfyEditMentorAnnouncement('${item.id}')">✏️ Edit</button>
+                <button type="button" class="btn danger" onclick="kfyDeleteMentorAnnouncement('${item.id}')">🗑 Delete</button>
+            </div>
+        </article>
+    `).join("") : `<div class="list-item">No announcements have been posted to this class yet.</div>`;
 
     return `
-
         <div class="grid two">
-
-            <!-- CREATE ANNOUNCEMENT -->
-
             <div class="card">
-
-                <div class="pill gold" style="margin-bottom:10px;">
-                    📢 Mentor
-                </div>
-
-                <h3>
-                    ማስታወቂያ ፍጠር
-                </h3>
-
-                <div
-                    style="
-                        display:grid;
-                        gap:12px;
-                    "
-                >
-
-                    <input
-                        id="announcement-title"
-                        placeholder="ርዕስ"
-                    >
-
-                    <textarea
-                        id="announcement-message"
-                        rows="5"
-                        placeholder="መልዕክት..."
-                    ></textarea>
-
-
-                    <!-- VOICE RECORDING -->
-
-                    <div
-                        style="
-                            padding:14px;
-                            border-radius:14px;
-                            border:1px solid rgba(255,255,255,.08);
-                            background:rgba(255,255,255,.02);
-                        "
-                    >
-
-                        <div
-                            class="muted"
-                            id="announcement-recording-status"
-                        >
-                            🎙️ የድምፅ ማስታወቂያ አልተቀረፀም
+                <div class="pill gold" style="margin-bottom:10px;">📢 Mentor</div>
+                <h3>ማስታወቂያ ፍጠር / አስተካክል</h3>
+                <input type="hidden" id="announcement-id" value="">
+                <div style="display:grid;gap:12px;">
+                    <input id="announcement-title" placeholder="ርዕስ">
+                    <textarea id="announcement-message" rows="5" placeholder="መልዕክት..."></textarea>
+                    <div style="padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);">
+                        <div class="muted" id="announcement-recording-status">🎙️ የድምፅ ማስታወቂያ አልተቀረፀም</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+                            <button type="button" class="btn secondary" id="start-announcement-recording">🎙️ Record</button>
+                            <button type="button" class="btn" id="stop-announcement-recording" disabled>⏹ Stop</button>
                         </div>
-
-
-                        <div
-                            style="
-                                display:flex;
-                                gap:8px;
-                                flex-wrap:wrap;
-                                margin-top:10px;
-                            "
-                        >
-
-                            <button
-                                type="button"
-                                class="btn secondary"
-                                id="start-announcement-recording"
-                            >
-                                🎙️ Record
-                            </button>
-
-
-                            <button
-                                type="button"
-                                class="btn"
-                                id="stop-announcement-recording"
-                                disabled
-                            >
-                                ⏹ Stop
-                            </button>
-
-                        </div>
-
-
-                        <audio
-                            id="announcement-audio-preview"
-                            controls
-                            style="
-                                display:none;
-                                width:100%;
-                                margin-top:12px;
-                            "
-                        ></audio>
-
+                        <audio id="announcement-audio-preview" controls style="display:none;width:100%;margin-top:12px;"></audio>
                     </div>
-
-
-                    <button
-                        type="button"
-                        class="btn primary"
-                        id="publish-announcement"
-                    >
-                        📢 ላክ
-                    </button>
-
+                    <div class="row" style="gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="btn primary" id="publish-announcement">📢 ላክ</button>
+                        <button type="button" class="btn" onclick="kfyResetMentorAnnouncementForm()">Cancel edit</button>
+                    </div>
                 </div>
-
             </div>
-
-
-            <!-- ANNOUNCEMENT HISTORY -->
-
             <div class="card">
-
-                <h3>
-                    የቅርብ ማስታወቂያዎች
-                </h3>
-
-                <div
-                    class="muted"
-                    style="margin-bottom:14px;"
-                >
-                    የተላኩ ማስታወቂያዎች
-                </div>
-
-                <div
-                    class="list"
-                    id="announcements-list"
-                >
-
-                    <div class="list-item">
-                        ማስታወቂያዎች
-                        እዚህ ይታያሉ።
-                    </div>
-
-                </div>
-
+                <h3>የቀድሞ ማስታወቂያዎች</h3>
+                <div class="muted" style="margin-bottom:14px;">Edit or delete announcements already sent to ${escapeHtml(mentorClass?.name || "your class")}.</div>
+                <div class="list" id="announcements-list">${history}</div>
             </div>
-
         </div>
-
     `;
-
 }
+
 async function studentAnnouncementsPage() {
 
     const classId =
@@ -10150,6 +10104,178 @@ async function leaderboardPage() {
 
     `;
 }
+async function loadStudentWarnings() {
+    const userId = window.currentUser?.id;
+    if (!userId) {
+        state.studentWarnings = [];
+        return;
+    }
+    const cacheKey = `kfy_student_warnings_${userId}`;
+    const readCache = () => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_) { return []; }
+    };
+    if (!navigator.onLine || !supabaseClient) {
+        state.studentWarnings = readCache();
+        return;
+    }
+    const { data, error } = await supabaseClient
+        .from("student_warnings")
+        .select("id,title,message,severity,status,created_at,resolved_at")
+        .eq("student_id", userId)
+        .order("created_at", { ascending: false });
+    if (error) {
+        console.warn("Student notices could not refresh:", error);
+        state.studentWarnings = readCache();
+        return;
+    }
+    state.studentWarnings = data || [];
+    try { localStorage.setItem(cacheKey, JSON.stringify(state.studentWarnings)); } catch (_) {}
+}
+
+function studentWarningsPage() {
+    const warnings = state.studentWarnings || [];
+    const active = warnings.filter(item => item.status === "active");
+    return `
+        <div class="page-stack">
+            <div class="hero">
+                <span class="pill gold">STUDENT ACCOUNT</span>
+                <h2>⚠️ Mentor notices</h2>
+                <p>Messages from your mentor. Read them carefully and speak with your mentor if anything is unclear.</p>
+            </div>
+            <div class="card">
+                <div class="row space"><h3>Your notices</h3><span class="pill ${active.length ? "gold" : ""}">${active.length} active</span></div>
+                ${warnings.length ? `<div class="list">${warnings.map(item => `
+                    <article class="list-item">
+                        <div class="row space" style="gap:10px;flex-wrap:wrap;">
+                            <strong>${escapeHtml(item.title || "Mentor notice")}</strong>
+                            <span class="pill ${item.status === "active" ? "gold" : ""}">${item.status === "active" ? "Active" : "Resolved"}</span>
+                        </div>
+                        <div class="muted" style="margin:7px 0;">${item.created_at ? new Date(item.created_at).toLocaleString() : ""} · ${escapeHtml(item.severity || "warning")}</div>
+                        <div style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(item.message || "")}</div>
+                    </article>
+                `).join("")}</div>` : `<div class="empty-state"><div style="font-size:38px;">🌿</div><h3>No mentor notices</h3><p class="muted">You do not have any notices at the moment.</p></div>`}
+            </div>
+        </div>
+    `;
+}
+
+async function loadMentorStudentWarnings(classId) {
+    if (!classId || !supabaseClient) {
+        state.mentorStudentWarnings = [];
+        return;
+    }
+    const { data, error } = await supabaseClient
+        .from("student_warnings")
+        .select("id,student_id,class_id,created_by,title,message,severity,status,created_at,resolved_at")
+        .eq("class_id", classId)
+        .order("created_at", { ascending: false });
+    if (error) {
+        console.error("Mentor warning history failed:", error);
+        state.mentorStudentWarnings = [];
+    } else {
+        state.mentorStudentWarnings = data || [];
+    }
+}
+
+function kfyRenderStudentWarningModal() {
+    const modal = get("student-warnings-modal");
+    const list = get("student-warning-history");
+    if (!modal || !list) return;
+    const studentId = window.kfyWarningStudentId;
+    const rows = (state.mentorStudentWarnings || []).filter(item => item.student_id === studentId);
+    list.innerHTML = rows.length ? rows.map(item => `
+        <article class="list-item">
+            <div class="row space" style="gap:8px;flex-wrap:wrap;">
+                <strong>${escapeHtml(item.title || "Mentor notice")}</strong>
+                <span class="pill ${item.status === "active" ? "gold" : ""}">${item.status === "active" ? "Active" : "Resolved"}</span>
+            </div>
+            <div class="muted" style="margin:5px 0;">${item.created_at ? new Date(item.created_at).toLocaleString() : ""} · ${escapeHtml(item.severity || "warning")}</div>
+            <div style="white-space:pre-wrap;line-height:1.6;">${escapeHtml(item.message || "")}</div>
+            <div class="row" style="gap:7px;flex-wrap:wrap;margin-top:9px;">
+                <button type="button" class="btn" onclick="kfyEditStudentWarning('${item.id}')">✏️ Edit</button>
+                <button type="button" class="btn" onclick="kfyToggleStudentWarning('${item.id}')">${item.status === "active" ? "✓ Resolve" : "↩ Reopen"}</button>
+                <button type="button" class="btn danger" onclick="kfyDeleteStudentWarning('${item.id}')">🗑 Delete</button>
+            </div>
+        </article>
+    `).join("") : `<div class="list-item muted">No notices have been issued to this student.</div>`;
+    modal.style.display = "flex";
+}
+
+window.kfyOpenStudentWarnings = async function(studentId, classId) {
+    window.kfyWarningStudentId = studentId;
+    window.kfyWarningClassId = classId;
+    const student = (state.mentorAttendanceStudents || []).find(item => item.student_id === studentId);
+    const profile = student?.profiles || {};
+    const name = get("student-warning-student-name");
+    if (name) name.textContent = profile.full_name || "Student";
+    const id = get("student-warning-id");
+    if (id) id.value = "";
+    if (get("student-warning-title")) get("student-warning-title").value = "";
+    if (get("student-warning-message")) get("student-warning-message").value = "";
+    if (get("student-warning-severity")) get("student-warning-severity").value = "warning";
+    await loadMentorStudentWarnings(classId);
+    kfyRenderStudentWarningModal();
+};
+
+window.kfyEditStudentWarning = function(warningId) {
+    const item = (state.mentorStudentWarnings || []).find(row => row.id === warningId);
+    if (!item) return;
+    get("student-warning-id").value = item.id;
+    get("student-warning-title").value = item.title || "";
+    get("student-warning-message").value = item.message || "";
+    get("student-warning-severity").value = item.severity || "warning";
+    get("student-warning-save").textContent = "💾 Update notice";
+    get("student-warning-title")?.focus();
+};
+
+window.kfyToggleStudentWarning = async function(warningId) {
+    const item = (state.mentorStudentWarnings || []).find(row => row.id === warningId);
+    if (!item) return;
+    const resolved = item.status === "active";
+    const { error } = await supabaseClient.from("student_warnings").update({
+        status: resolved ? "resolved" : "active",
+        resolved_at: resolved ? new Date().toISOString() : null,
+        resolved_by: resolved ? window.currentUser?.id || null : null,
+        updated_at: new Date().toISOString()
+    }).eq("id", warningId);
+    if (error) { showToast(`Could not update notice: ${error.message}`); return; }
+    await loadMentorStudentWarnings(window.kfyWarningClassId);
+    kfyRenderStudentWarningModal();
+    showToast(resolved ? "Notice marked resolved" : "Notice reopened");
+};
+
+window.kfyDeleteStudentWarning = async function(warningId) {
+    if (!confirm("Delete this student notice permanently?")) return;
+    const { error } = await supabaseClient.from("student_warnings").delete().eq("id", warningId);
+    if (error) { showToast(`Could not delete notice: ${error.message}`); return; }
+    await loadMentorStudentWarnings(window.kfyWarningClassId);
+    kfyRenderStudentWarningModal();
+    showToast("Notice deleted");
+};
+
+function studentWarningsModalMarkup() {
+    return `
+        <div id="student-warnings-modal" class="kfy-modal-overlay" style="display:none;">
+            <section class="card kfy-modal-card">
+                <div class="row space"><div><span class="pill gold">MENTOR TO STUDENT</span><h3 id="student-warning-student-name" style="margin-top:8px;">Student notices</h3></div><button type="button" class="btn" onclick="document.getElementById('student-warnings-modal').style.display='none'">✕</button></div>
+                <form id="student-warning-form" class="kfy-form-stack">
+                    <input type="hidden" id="student-warning-id" value="">
+                    <label>Notice title<input id="student-warning-title" maxlength="100" placeholder="e.g. Classroom behaviour reminder" required></label>
+                    <label>Message<textarea id="student-warning-message" rows="4" maxlength="2000" placeholder="Explain what needs to improve, respectfully and clearly..." required></textarea></label>
+                    <label>Level<select id="student-warning-severity"><option value="reminder">Reminder</option><option value="warning" selected>Warning</option><option value="serious">Serious warning</option></select></label>
+                    <div class="row" style="gap:8px;flex-wrap:wrap;"><button class="btn primary" id="student-warning-save" type="submit">＋ Issue notice</button><button class="btn" type="button" onclick="get('student-warning-id').value='';get('student-warning-title').value='';get('student-warning-message').value='';get('student-warning-save').textContent='＋ Issue notice'">Clear</button></div>
+                </form>
+                <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;">
+                <h4>Previous notices</h4>
+                <div id="student-warning-history" class="list"></div>
+            </section>
+        </div>
+    `;
+}
+
 async function renderPage() {
 
     let html = "";
@@ -10162,6 +10288,8 @@ async function renderPage() {
     */
 
     if (state.role === "student") {
+
+        await loadStudentWarnings();
 
         switch (state.page) {
 
@@ -10217,6 +10345,14 @@ async function renderPage() {
 
                 html =
                     await kfyMentorLessonsPage();
+
+                break;
+
+
+            case "warnings":
+
+                html =
+                    studentWarningsPage();
 
                 break;
 
@@ -10318,6 +10454,10 @@ async function renderPage() {
                         classId
                     );
 
+                    await loadMentorStudentWarnings(
+                        classId
+                    );
+
                 }
 
 
@@ -10364,7 +10504,7 @@ async function renderPage() {
             case "announcements":
 
                 html =
-                    announcementsPage();
+                    await announcementsPage();
 
                 break;
 
@@ -11725,6 +11865,7 @@ async function kfyTutorPage() {
     }
 
     let mezmurs = [];
+    let mezmurLoadError = "";
 
     try {
         const { data, error } = await supabaseClient
@@ -11738,6 +11879,7 @@ async function kfyTutorPage() {
                 qenet,
                 level,
                 audio_path,
+                youtube_url,
                 published,
                 created_at
             `)
@@ -11746,11 +11888,14 @@ async function kfyTutorPage() {
             });
 
         if (error) {
+            mezmurLoadError = error.message || "Supabase could not load the Mezmur list.";
             console.error("❌ Mentor Mezmur loading failed:", error);
         } else {
-            mezmurs = data || [];
+            mezmurs = Array.isArray(data) ? data : [];
+            console.info(`✅ Mentor Mezmur list loaded: ${mezmurs.length} record(s).`);
         }
     } catch (error) {
+        mezmurLoadError = error?.message || String(error);
         console.error("❌ Mentor Mezmur request failed:", error);
     }
 
@@ -11769,7 +11914,7 @@ async function kfyTutorPage() {
                 <h3>➕ አዲስ መዝሙር ጨምር</h3>
 
                 <form id="add-mezmur-form">
-
+                    <input type="hidden" id="mezmur-id" value="">
                     <div class="form-grid">
 
                         <label>
@@ -11819,6 +11964,16 @@ async function kfyTutorPage() {
                         </label>
 
                         <label>
+                            YouTube video link for this Mezmur (optional)
+                            <input
+                                id="mezmur-youtube-url"
+                                type="url"
+                                placeholder="Paste this Mezmur's YouTube link: https://youtu.be/..."
+                            >
+                            <small class="muted">Each Mezmur has its own video. Paste the matching link when you add or edit it; leave blank when there is no video.</small>
+                        </label>
+
+                        <label>
                             Level
                             <input
                                 id="mezmur-level"
@@ -11837,6 +11992,7 @@ async function kfyTutorPage() {
                     >
                         💾 መዝሙሩን አስቀምጥ
                     </button>
+                    <button type="button" class="btn" onclick="kfyResetMentorMezmurForm()">Cancel edit</button>
 
                     <p
                         id="mezmur-form-message"
@@ -11849,10 +12005,21 @@ async function kfyTutorPage() {
 
             <div class="card">
 
-                <h3>📚 የተጨመሩ መዝሙሮች</h3>
+                <div class="row space" style="align-items:center;gap:12px;flex-wrap:wrap;">
+                    <h3>📚 የተጨመሩ መዝሙሮች</h3>
+                    <button type="button" class="btn" onclick="kfyRefreshMentorMezmurList()">↻ Refresh list</button>
+                </div>
+
+                ${mezmurLoadError ? `
+                    <div class="card" style="border:1px solid #c45b5b;background:rgba(196,91,91,.08);">
+                        <strong>Could not load the Mezmur list.</strong>
+                        <p class="muted">${escapeHtml(mezmurLoadError)}</p>
+                        <p class="muted">Your saved records have not been deleted. Check your connection and refresh the list.</p>
+                    </div>
+                ` : ""}
 
                 ${
-                    mezmurs.length
+                    (window.kfyMentorMezmurs = mezmurs, mezmurs.length)
                         ? mezmurs.map(mezmur => `
                             <div class="list-item">
 
@@ -11877,6 +12044,9 @@ async function kfyTutorPage() {
                                 </div>
 
                                 <div>
+                                    <span class="pill ${mezmur.youtube_url ? "success" : ""}">
+                                        ${mezmur.youtube_url ? "▶️ Video attached" : "No video"}
+                                    </span>
                                     ${
                                         mezmur.qenet
                                             ? `
@@ -11911,7 +12081,10 @@ async function kfyTutorPage() {
                                         }
                                     </span>
                                 </div>
-
+                                <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px;">
+                                    <button type="button" class="btn" onclick="kfyEditMentorMezmur('${mezmur.id}')">✏️ Edit</button>
+                                    <button type="button" class="btn danger" onclick="kfyDeleteMentorMezmur('${mezmur.id}')">🗑 Delete</button>
+                                </div>
                             </div>
                         `).join("")
                         : `
@@ -12560,13 +12733,22 @@ async function kfyMentorLessonsPage() {
                                         </div>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        class="btn"
-                                        onclick="kfyEditMentorLesson('${kfyEscapeAttr(lesson.id)}')"
-                                    >
-                                        ✏️ Edit
-                                    </button>
+                                    <div class="row" style="gap:8px;flex-wrap:wrap;">
+                                        <button
+                                            type="button"
+                                            class="btn"
+                                            onclick="kfyEditMentorLesson('${kfyEscapeAttr(lesson.id)}')"
+                                        >
+                                            ✏️ Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="btn danger"
+                                            onclick="kfyDeleteMentorLesson('${kfyEscapeAttr(lesson.id)}')"
+                                        >
+                                            🗑 Delete
+                                        </button>
+                                    </div>
                                 </div>
                             `).join("")}
                         </div>
@@ -12919,6 +13101,18 @@ function kfyEditMentorLesson(lessonId) {
     modal.style.display = "block";
 }
 
+
+window.kfyDeleteMentorLesson = async function(lessonId) {
+    if (!confirm("Delete this lesson? Related student progress or assignments may prevent removal.")) return;
+    const classId = state.mentorClasses?.[0]?.id || state.currentClass?.id;
+    const { error } = await supabaseClient.from("lessons").delete().eq("id", lessonId).eq("class_id", classId);
+    if (error) {
+        showToast(`Could not delete lesson: ${error.message}. Check whether it is already linked to an assignment or progress record.`);
+        return;
+    }
+    showToast("Lesson deleted");
+    await render();
+};
 
 function kfyCloseMentorLessonModal() {
     const modal = document.getElementById(
@@ -13377,28 +13571,17 @@ async function publishAnnouncement() {
             hasAudio: !!announcementAudioBlob
         });
 
-        const {
-            data: announcement,
-            error: insertError
-        } = await supabaseClient
-            .from("announcements")
-            .insert({
-                title,
-                body:
-                    message ||
-                    (
-                        announcementAudioBlob
-                            ? "🎙️ Voice announcement"
-                            : ""
-                    ),
-                created_by: user.id,
-                target_class_id: classId,
-                published: true,
-                published_at:
-                    new Date().toISOString()
-            })
-            .select()
-            .single();
+        const announcementId = get("announcement-id")?.value.trim() || "";
+        const announcementPayload = {
+            title,
+            body: message || (announcementAudioBlob ? "🎙️ Voice announcement" : ""),
+            target_class_id: classId,
+            published: true,
+            published_at: new Date().toISOString()
+        };
+        const { data: announcement, error: insertError } = announcementId
+            ? await supabaseClient.from("announcements").update(announcementPayload).eq("id", announcementId).eq("target_class_id", classId).select().single()
+            : await supabaseClient.from("announcements").insert({ ...announcementPayload, created_by: user.id }).select().single();
 
         if (insertError) {
             console.error(
@@ -13446,7 +13629,7 @@ async function publishAnnouncement() {
                         contentType:
                             announcementAudioBlob.type ||
                             "audio/webm",
-                        upsert: false
+                        upsert: true
                     }
                 );
 
@@ -13456,10 +13639,12 @@ async function publishAnnouncement() {
                     uploadError
                 );
 
-                await supabaseClient
-                    .from("announcements")
-                    .delete()
-                    .eq("id", announcement.id);
+                if (!announcementId) {
+                    await supabaseClient
+                        .from("announcements")
+                        .delete()
+                        .eq("id", announcement.id);
+                }
 
                 showToast(
                     "❌ " +
@@ -13506,6 +13691,7 @@ async function publishAnnouncement() {
         if (titleInput) {
             titleInput.value = "";
         }
+        if (get("announcement-id")) get("announcement-id").value = "";
 
         if (messageInput) {
             messageInput.value = "";
@@ -13532,7 +13718,7 @@ if (announcementAudioPreview) {
         }
 
         showToast(
-            "✅ ማስታወቂያው ተልኳል!"
+            announcementId ? "✅ Announcement updated" : "✅ ማስታወቂያው ተልኳል!"
         );
 
         await renderPage();
@@ -13653,6 +13839,118 @@ async function loadMentorAttendanceSelectedDate() {
 }
 
 
+window.kfyResetMentorAssignmentForm = function() {
+    if (get("assignment-id")) get("assignment-id").value = "";
+    if (get("assignment-title")) get("assignment-title").value = "";
+    if (get("assignment-description")) get("assignment-description").value = "";
+    const button = get("publish-assignment");
+    if (button) button.textContent = "📤 ላክ";
+};
+
+window.kfyEditMentorAssignment = function(assignmentId) {
+    const item = (window.kfyMentorAssignments || []).find(row => row.id === assignmentId);
+    if (!item) return;
+    get("assignment-id").value = item.id;
+    get("assignment-title").value = item.title_am || "";
+    get("assignment-description").value = item.instructions_am || "";
+    const button = get("publish-assignment");
+    if (button) button.textContent = "💾 Update assignment";
+    get("assignment-title")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    get("assignment-title")?.focus();
+};
+
+window.kfyDeleteMentorAssignment = async function(assignmentId) {
+    if (!confirm("Delete this assignment? Submitted student work may prevent deletion.")) return;
+    const { error } = await supabaseClient.from("assignments").delete().eq("id", assignmentId);
+    if (error) {
+        showToast(`Could not delete assignment: ${error.message}. Submitted work has not been removed.`);
+        return;
+    }
+    showToast("Assignment deleted");
+    await render();
+};
+
+window.kfyResetMentorAnnouncementForm = function() {
+    if (get("announcement-id")) get("announcement-id").value = "";
+    if (get("announcement-title")) get("announcement-title").value = "";
+    if (get("announcement-message")) get("announcement-message").value = "";
+    const button = get("publish-announcement");
+    if (button) button.textContent = "📢 ላክ";
+    announcementAudioBlob = null;
+    const preview = get("announcement-audio-preview");
+    if (preview) { preview.pause(); preview.src = ""; preview.style.display = "none"; }
+    const status = get("announcement-recording-status");
+    if (status) status.textContent = "🎙️ የድምፅ ማስታወቂያ አልተቀረፀም";
+};
+
+window.kfyEditMentorAnnouncement = function(announcementId) {
+    const item = (window.kfyMentorAnnouncements || []).find(row => row.id === announcementId);
+    if (!item) return;
+    get("announcement-id").value = item.id;
+    get("announcement-title").value = item.title || "";
+    get("announcement-message").value = item.body || "";
+    const button = get("publish-announcement");
+    if (button) button.textContent = "💾 Update announcement";
+    const status = get("announcement-recording-status");
+    if (status) status.textContent = item.audio_path ? "🎙️ Existing voice recording will be kept unless you record a new one." : "No voice recording attached.";
+    get("announcement-title")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    get("announcement-title")?.focus();
+};
+
+window.kfyDeleteMentorAnnouncement = async function(announcementId) {
+    if (!confirm("Delete this announcement from the students' page?")) return;
+    const item = (window.kfyMentorAnnouncements || []).find(row => row.id === announcementId);
+    const { error } = await supabaseClient.from("announcements").delete().eq("id", announcementId);
+    if (error) { showToast(`Could not delete announcement: ${error.message}`); return; }
+    if (item?.audio_path) {
+        const { error: storageError } = await supabaseClient.storage
+            .from("announcement-audio").remove([item.audio_path]);
+        if (storageError) console.warn("Announcement audio cleanup failed:", storageError);
+    }
+    showToast("Announcement deleted");
+    await render();
+};
+
+window.kfyRefreshMentorMezmurList = async function() {
+    if (window.currentProfile?.role !== "mentor" && window.currentProfile?.role !== "admin") {
+        showToast("Only mentors can refresh this list.");
+        return;
+    }
+    await render();
+};
+
+window.kfyResetMentorMezmurForm = function() {
+    const form = get("add-mezmur-form");
+    if (form) form.reset();
+    if (get("mezmur-id")) get("mezmur-id").value = "";
+    const button = form?.querySelector('button[type="submit"]');
+    if (button) button.textContent = "💾 መዝሙሩን አስቀምጥ";
+};
+
+window.kfyEditMentorMezmur = function(mezmurId) {
+    const item = (window.kfyMentorMezmurs || []).find(row => row.id === mezmurId);
+    if (!item) return;
+    get("mezmur-id").value = item.id;
+    get("mezmur-title-am").value = item.title_am || "";
+    get("mezmur-title-en").value = item.title_en || "";
+    get("mezmur-lyrics-am").value = item.lyrics_am || "";
+    get("mezmur-meaning-en").value = item.meaning_en || "";
+    get("mezmur-qenet").value = item.qenet || "";
+    get("mezmur-level").value = item.level || "";
+    get("mezmur-youtube-url").value = item.youtube_url || "";
+    const button = get("add-mezmur-form")?.querySelector('button[type="submit"]');
+    if (button) button.textContent = "💾 Update Mezmur";
+    get("add-mezmur-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+window.kfyDeleteMentorMezmur = async function(mezmurId) {
+    if (!confirm("Delete this Mezmur? Students will no longer see it.")) return;
+    const { error } = await supabaseClient.from("mezmur").delete().eq("id", mezmurId);
+    if (error) { showToast(`Could not delete Mezmur: ${error.message}`); return; }
+    showToast("Mezmur deleted");
+    await render();
+};
+
 function bindPageActions() {
     setupTeacherSearch(
     "teacher-students-search",
@@ -13688,6 +13986,36 @@ setupTeacherSearch(
             "change",
             loadMentorAttendanceSelectedDate
         );
+    }
+
+    const studentWarningForm = get("student-warning-form");
+    if (studentWarningForm) {
+        studentWarningForm.addEventListener("submit", async event => {
+            event.preventDefault();
+            const studentId = window.kfyWarningStudentId;
+            const classId = window.kfyWarningClassId;
+            const warningId = get("student-warning-id")?.value.trim();
+            const title = get("student-warning-title")?.value.trim();
+            const message = get("student-warning-message")?.value.trim();
+            const severity = get("student-warning-severity")?.value || "warning";
+            if (!studentId || !classId || !title || !message) {
+                showToast("Enter a title and a clear notice message.");
+                return;
+            }
+            const payload = { title, message, severity, updated_at: new Date().toISOString() };
+            const result = warningId
+                ? await supabaseClient.from("student_warnings").update(payload).eq("id", warningId).eq("student_id", studentId).eq("class_id", classId)
+                : await supabaseClient.from("student_warnings").insert({ ...payload, student_id: studentId, class_id: classId, created_by: window.currentUser?.id, status: "active" });
+            if (result.error) { showToast(`Could not save notice: ${result.error.message}`); return; }
+            get("student-warning-id").value = "";
+            get("student-warning-title").value = "";
+            get("student-warning-message").value = "";
+            get("student-warning-severity").value = "warning";
+            get("student-warning-save").textContent = "＋ Issue notice";
+            await loadMentorStudentWarnings(classId);
+            kfyRenderStudentWarningModal();
+            showToast(warningId ? "Notice updated" : "Notice issued to student");
+        });
     }
 
     const changePasswordForm = get("change-password-form");
@@ -13740,54 +14068,13 @@ setupTeacherSearch(
 
                     state.selectedString =
                         number;
+                    document.querySelectorAll(".begena-string").forEach(item => item.classList.toggle("is-selected", Number(item.dataset.string) === number));
 
-
-                    const output =
-                        get("string-name");
-
-
-                    if (output) {
-
-                        output.textContent =
-                            `ገመድ ${number}`;
-
-                    }
-
-
-                    const preset =
-                        state.selectedPreset ||
-                        "Selamta";
-
-
-                    const sound =
-                        begenaAudio[
-                            preset
-                        ]?.[number];
-
-
-                    if (sound) {
-
-                        try {
-
-                            sound.currentTime = 0;
-
-                            sound.play();
-
-                        } catch (error) {
-
-                            console.warn(
-                                "Begena audio playback failed:",
-                                error
-                            );
-
-                        }
-
-                    }
-
-
-                    showToast(
-                        `🎵 String ${number}`
-                    );
+                    const target = getBegenaPracticeTargets().find(item => item.stringNumber === number);
+                    const output = get("string-name");
+                    if (output) output.textContent = target ? `String ${number} · ${target.note}` : `String ${number}`;
+                    playBegenaPracticeString(number);
+                    showToast(target ? `🎵 String ${number}: ${target.note}` : `String ${number}`);
 
                 }
             );
@@ -13804,38 +14091,53 @@ setupTeacherSearch(
 
 
     if (preset) {
+        preset.value = state.selectedPracticeKignet || "Selamta";
+        preset.addEventListener("change", async () => {
+            state.selectedPracticeKignet = preset.value;
+            state.selectedString = null;
+            await render();
+        });
+    }
 
-        preset.value =
-            state.selectedPreset;
+    const practiceMajor = get("begena-major-select");
+    if (practiceMajor) {
+        practiceMajor.value = state.selectedPracticeMajor || "D";
+        practiceMajor.addEventListener("change", async () => {
+            state.selectedPracticeMajor = practiceMajor.value;
+            state.selectedString = null;
+            await render();
+        });
+    }
 
-
-        preset.addEventListener(
-            "change",
-            () => {
-
-                state.selectedPreset =
-                    preset.value;
-
-
-                const output =
-                    get("preset-name");
-
-
-                if (output) {
-
-                    output.textContent =
-                        state.selectedPreset;
-
+    const practiceButton = get("begena-practice-button");
+    if (practiceButton) {
+        practiceButton.addEventListener("click", async () => {
+            const shell = document.querySelector(".begena-practice-shell");
+            if (!shell) return;
+            try {
+                if (!document.fullscreenElement) {
+                    if (shell.requestFullscreen) await shell.requestFullscreen();
+                    if (screen.orientation?.lock) {
+                        try { await screen.orientation.lock("landscape"); } catch (_) {}
+                    }
+                    practiceButton.textContent = "✕ Exit Practice";
+                } else {
+                    await document.exitFullscreen();
+                    try { screen.orientation?.unlock?.(); } catch (_) {}
+                    practiceButton.textContent = "⛶ Landscape Practice";
                 }
-
-
-                showToast(
-                    `Preset: ${state.selectedPreset}`
-                );
-
+            } catch (error) {
+                console.warn("Landscape practice mode unavailable:", error);
+                showToast("Rotate your device to landscape for the wide practice view.");
             }
-        );
-
+        });
+        if (!window.kfyFullscreenListenerAttached) {
+            document.addEventListener("fullscreenchange", () => {
+                const button = get("begena-practice-button");
+                if (button) button.textContent = document.fullscreenElement ? "✕ Exit Practice" : "⛶ Landscape Practice";
+            });
+            window.kfyFullscreenListenerAttached = true;
+        }
     }
     const addMezmurForm = get("add-mezmur-form");
 
@@ -13867,6 +14169,13 @@ if (addMezmurForm) {
             levelValue
                 ? Number(levelValue)
                 : null;
+        const youtubeInput = get("mezmur-youtube-url")?.value.trim() || "";
+        const youtubeUrl = youtubeInput ? (getYouTubeEmbedUrl(youtubeInput) ? youtubeInput : null) : null;
+        const mezmurId = get("mezmur-id")?.value.trim() || "";
+        if (youtubeInput && !youtubeUrl) {
+            if (message) message.textContent = "Enter a valid YouTube watch or share URL.";
+            return;
+        }
 
         if (!titleAm) {
             if (message) {
@@ -13896,39 +14205,43 @@ if (addMezmurForm) {
         }
 
         try {
-            const { error } =
-                await supabaseClient
-                    .from("mezmur")
-                    .insert({
-                        title_am: titleAm,
-                        title_en: titleEn || null,
-                        lyrics_am: lyricsAm || null,
-                        meaning_en: meaningEn || null,
-                        qenet: qenet || null,
-                        level: level,
-                        audio_path: null,
-                        published: true,
-                        created_by: window.currentUser.id
-                    });
+            const payload = {
+                title_am: titleAm,
+                title_en: titleEn || null,
+                lyrics_am: lyricsAm || null,
+                meaning_en: meaningEn || null,
+                qenet: qenet || null,
+                level,
+                youtube_url: youtubeUrl,
+                published: true
+            };
+            const saveQuery = mezmurId
+                ? supabaseClient.from("mezmur").update(payload).eq("id", mezmurId)
+                : supabaseClient.from("mezmur").insert({ ...payload, audio_path: null, created_by: window.currentUser.id });
+
+            const { data: savedRows, error } = await saveQuery
+                .select("id, title_am, published, created_at")
+                .limit(1);
 
             if (error) {
-                console.error(
-                    "❌ Mezmur insert failed:",
-                    error
-                );
-
+                console.error("❌ Mezmur save failed:", error);
                 if (message) {
-                    message.textContent =
-                        "መዝሙሩን ማስቀመጥ አልተቻለም።";
+                    message.textContent = `Could not save Mezmur: ${error.message}`;
                 }
-
+                showToast(`❌ Mezmur was not saved: ${error.message}`);
                 return;
             }
 
-            showToast(
-                "✅ መዝሙሩ ተጨምሯል!"
-            );
+            if (!Array.isArray(savedRows) || savedRows.length === 0) {
+                const verifyMessage = "Supabase did not return the saved record. Check your access permissions and refresh the list before trying again.";
+                console.error("❌ Mezmur save returned no row to verify.");
+                if (message) message.textContent = verifyMessage;
+                showToast("⚠️ Save could not be verified. Refresh the Mezmur list.");
+                return;
+            }
 
+            console.info("✅ Mezmur saved and verified:", savedRows[0]);
+            showToast(mezmurId ? "✅ Mezmur updated and verified" : "✅ መዝሙሩ ተጨምሯል!");
             await render();
 
         } catch (error) {
@@ -14010,66 +14323,6 @@ if (addMezmurForm) {
                 } else {
 
                     await startMekagna();
-
-                }
-
-            }
-        );
-
-    }
-
-
-    /* =========================================
-       BEGENA PRACTICE MODE
-    ========================================= */
-
-    const begenaPracticeButton =
-        get("begena-practice-button");
-
-
-    if (begenaPracticeButton) {
-
-        begenaPracticeButton.addEventListener(
-            "click",
-            () => {
-
-                const begenaCard =
-                    begenaPracticeButton.closest(".grid");
-
-
-                if (!begenaCard) {
-                    return;
-                }
-
-
-                begenaCard.classList.toggle(
-                    "begena-practice-mode"
-                );
-
-
-                if (
-                    begenaCard.classList.contains(
-                        "begena-practice-mode"
-                    )
-                ) {
-
-                    begenaPracticeButton.textContent =
-                        "↩ Normal View";
-
-
-                    showToast(
-                        "🎻 Begena Practice Mode"
-                    );
-
-                } else {
-
-                    begenaPracticeButton.textContent =
-                        "🎻 Practice Mode";
-
-
-                    showToast(
-                        "↩ Normal View"
-                    );
 
                 }
 
@@ -14835,30 +15088,16 @@ if (publishAssignment) {
                    INSERT ASSIGNMENT
                 ----------------------------- */
 
-                const {
-                    data,
-                    error
-                } =
-                    await supabaseClient
-                        .from("assignments")
-                        .insert({
-                            title_am:
-                                title,
-
-                            instructions_am:
-                                description,
-
-                            class_id:
-                                mentorClass.id,
-
-                            created_by:
-                                window.currentUser.id,
-
-                            status:
-                                "published"
-                        })
-                        .select()
-                        .single();
+                const assignmentId = get("assignment-id")?.value.trim() || "";
+                const assignmentPayload = {
+                    title_am: title,
+                    instructions_am: description,
+                    class_id: mentorClass.id,
+                    status: "published"
+                };
+                const { data, error } = assignmentId
+                    ? await supabaseClient.from("assignments").update(assignmentPayload).eq("id", assignmentId).eq("class_id", mentorClass.id).select().single()
+                    : await supabaseClient.from("assignments").insert({ ...assignmentPayload, created_by: window.currentUser.id }).select().single();
 
                 if (error) {
 
@@ -14880,7 +15119,7 @@ if (publishAssignment) {
                 ----------------------------- */
 
                 showToast(
-                    "✅ ስራው በተሳካ ሁኔታ ተላክ"
+                    assignmentId ? "✅ Assignment updated" : "✅ ስራው በተሳካ ሁኔታ ተላክ"
                 );
 
                 /* -----------------------------
@@ -14894,6 +15133,7 @@ if (publishAssignment) {
                 if (descriptionInput) {
                     descriptionInput.value = "";
                 }
+                if (get("assignment-id")) get("assignment-id").value = "";
 
                 /* -----------------------------
                    REFRESH PAGE
@@ -15733,6 +15973,7 @@ async function render() {
             "mezmur",
             "tutor",
             "leaderboard",
+            "warnings",
             "lessons",
             "attendance",
             "assignments",
